@@ -3,9 +3,5 @@
 version = 3
 
 [[package]]
-name = "bc-hostcall"
-version = "0.1.0"
-
-[[package]]
 name = "low-level"
 version = "0.1.0"

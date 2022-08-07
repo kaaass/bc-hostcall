@@ -7,3 +7,8 @@ description = "An asynchronized wasm hostcall framework bridging between rust mo
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[workspace]
+members = [
+    "modules/low-level",
+]
