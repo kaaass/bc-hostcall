@@ -55,6 +55,50 @@ macro_rules! set_message_callback {
     }
 }
 
+/// 供模块内使用的 WASM 内存分配，符合 WASM Component Model Proposal
+///
+/// 本函数是开源项目 bytecodealliance/wit-bindgen 的一部分，遵照 Apache License 协议引入
+///
+#[doc(hidden)]
+#[no_mangle]
+unsafe extern "C" fn canonical_abi_realloc(
+    old_ptr: *mut u8,
+    old_len: usize,
+    align: usize,
+    new_len: usize,
+) -> *mut u8 {
+    let layout;
+    let ptr = if old_len == 0 {
+        if new_len == 0 {
+            return align as *mut u8;
+        }
+        layout = Layout::from_size_align_unchecked(new_len, align);
+        alloc::alloc(layout)
+    } else {
+        layout = Layout::from_size_align_unchecked(old_len, align);
+        alloc::realloc(old_ptr, layout, new_len)
+    };
+    if ptr.is_null() {
+        alloc::handle_alloc_error(layout);
+    }
+    return ptr;
+}
+
+/// 供模块内使用的 WASM 内存释放，符合 WASM Component Model Proposal
+///
+/// 本函数是开源项目 bytecodealliance/wit-bindgen 的一部分，遵照 Apache License 协议引入
+///
+#[doc(hidden)]
+#[no_mangle]
+pub unsafe extern "C" fn canonical_abi_free(ptr: *mut u8, len: usize, align: usize) {
+    if len == 0 {
+        return;
+    }
+    let layout = Layout::from_size_align_unchecked(len, align);
+    alloc::dealloc(ptr, layout);
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
