@@ -1,0 +1,26 @@
+name: Build and test
+
+on:
+  push:
+    branches: [ "dev", "master", "feature/*", "release/*", "hotfix/*" ]
+  pull_request:
+    branches: [ "dev", "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --workspace --verbose
+      - name: Add wasm32 toolchain
+        run: rustup target add wasm32-wasi
+      - name: Build test dependency
+        run: ./compile_tests.sh
+      - name: Run tests
+        run: cargo test --workspace --verbose
