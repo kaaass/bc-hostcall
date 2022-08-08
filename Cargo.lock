@@ -1013,6 +1013,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "serialize"
+version = "0.1.0"
+
+[[package]]
 name = "sha2"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
