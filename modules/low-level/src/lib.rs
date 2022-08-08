@@ -1,6 +1,9 @@
 //! 低层通信模块，负责为上层模块提供一种复杂信息的传送方式
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod host;
+
+#[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
 // FIXME: 此处的错误类型仅仅是最简单，可用于容纳任何错误的类型。而实际上好的错误类型
@@ -10,6 +13,7 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
     use wasmtime::*;
