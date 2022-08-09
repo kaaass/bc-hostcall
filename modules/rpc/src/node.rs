@@ -71,3 +71,57 @@ impl<T> RpcNode<T>
         todo!();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::abi::LinkHint::Host;
+    use super::*;
+
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use std::cell::Cell;
+    use crate::RpcResponseCtx;
+
+    static mut MSG: Option<Vec<u8>> = None;
+
+    struct MockAdapter;
+
+    impl adapter::SendMessageAdapter for MockAdapter {
+        fn send_message(&self, msg: &[u8]) -> Result<()> {
+            // 保存发送的消息
+            unsafe {
+                MSG = Some(msg.to_vec());
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_call_request() {
+        let serialize_ctx = SerializeCtx::new();
+        let mut node = RpcNode::new(serialize_ctx, 0, MockAdapter);
+
+        // 模块导出了 test 函数
+        let mut func = abi::FunctionIdent::new("test");
+        func.set_hint(Host);
+        let mut exports = RpcExports::new(func.hint.clone());
+        let count: Arc<Mutex<Cell<i32>>> = Arc::new(Mutex::new(Cell::new(0)));
+        let inner_count = count.clone();
+        exports.add_exports(func.clone(), Box::new(move |_: &'_ RpcResponseCtx<'_>, _: &'_ [u8]| {
+            let count = inner_count.lock().unwrap();
+            count.set(count.get() + 1);
+            println!("test 被调用，count = {}", count.get());
+            Ok(())
+        }));
+        node.set_exports(exports);
+
+        // FIXME: 发送一个调用请求
+        // node.request().send_request(func.clone(), &[]).unwrap();
+
+        // FIXME: 处理调用请求
+        // node.handle_message(unsafe { MSG.as_ref().unwrap() }).unwrap();
+
+        // 检验结果
+        // assert_eq!(1, count.lock().unwrap().get());
+    }
+}
