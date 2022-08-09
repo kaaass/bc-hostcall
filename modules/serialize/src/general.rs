@@ -62,8 +62,10 @@ impl SerializeCtx {
     /// let actual: &str = ctx.deserialize::<&str>(bytes).unwrap().into();
     /// assert_eq!(expected, actual);
     /// ```
-    pub fn deserialize<T: HostcallValue>(&self, bytes: &[u8]) -> Result<impl Into<&T>> {
-        todo!() as Result<&T>
+    pub fn deserialize<'a, 'b, T>(&'a self, bytes: &'b [u8]) -> Result<impl Into<&'b T>>
+        where T: HostcallValue + 'b,
+    {
+        todo!() as Result<&'b T>
     }
 }
 
