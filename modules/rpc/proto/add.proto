@@ -1,0 +1,15 @@
+syntax = "proto3";
+package myadd;
+
+service Greeter {
+    rpc MyAdd (AddRequest) returns (AddReply);
+}
+
+message AddRequest {
+   int32 a = 1;
+   int32 b = 2;
+}
+
+message AddReply {
+    int32 c = 1;
+}
