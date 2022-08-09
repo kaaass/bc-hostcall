@@ -13,4 +13,5 @@ members = [
     "modules/low-level",
     "modules/serialize",
     "modules/rpc",
+    "modules/rpc/tests/integrate-host",
 ]

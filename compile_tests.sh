@@ -8,3 +8,6 @@ cd $base_dir || exit
 
 # low-level 模块
 ./modules/low-level/tests/guest/build.sh
+
+# rpc 模块
+./modules/rpc/tests/integrate-wasm/build.sh
