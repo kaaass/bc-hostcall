@@ -18,9 +18,8 @@ impl<'a> RpcRequestCtx<'a> {
         }
     }
 
-    pub fn send_request(&self, func: abi::FunctionIdent, args: Args) -> Result<()> {
+    pub fn send_request(&self, func: abi::FunctionIdent, args: &[u8]) -> Result<()> {
         // TODO: 发送一个 RPC 调用请求报文。报文别忘了要带 seq_no。
-        let arg_bytes = args.to_bytes();
         todo!()
     }
 

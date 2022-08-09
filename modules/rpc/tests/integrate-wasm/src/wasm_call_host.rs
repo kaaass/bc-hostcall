@@ -23,7 +23,7 @@ fn host_export_to_wasm(param: String) {
         .build(req.serialize_ctx())
         .unwrap();
     // 发送消息
-    req.send_request(func, args);
+    req.send_request(func, args.to_bytes()).unwrap();
     // 完成上述操作后，应该已经调用了 `__bc_wrapper_wasm_export_to_host` 并停止
     // 在异步调用 `wasm_export_to_host` 之前。此时就等待返回报文触发
     // `wasm_export_to_host_return` 回调。如果已经支持异步的话，则此处是在 await
