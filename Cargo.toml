@@ -12,4 +12,5 @@ description = "An asynchronized wasm hostcall framework bridging between rust mo
 members = [
     "modules/low-level",
     "modules/rpc",
+    "modules/serialize",
 ]

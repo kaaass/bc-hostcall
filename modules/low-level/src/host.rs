@@ -25,7 +25,7 @@ impl LowLevelCtx {
     ///
     /// ## 使用示例
     ///
-    /// ```rust
+    /// ```no_run
     /// use low_level::host::LowLevelCtx;
     /// fn receive_message_from_wasm(msg: &[u8]) {
     ///    println!("接收到 WASM 消息：{:?}", msg);
@@ -47,7 +47,7 @@ impl LowLevelCtx {
     ///
     /// ## 使用示例
     ///
-    /// ```rust
+    /// ```no_run
     /// use low_level::host::LowLevelCtx;
     ///
     /// let ctx = LowLevelCtx::new();
