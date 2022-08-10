@@ -23,17 +23,27 @@ pub extern "C" fn check_signal_at(ptr: *mut u8) -> bool {
 /// 发送指定消息至 host，用于对 `low_level::wasm::send_message_to_host` 进行测试
 #[no_mangle]
 pub extern "C" fn test_send_message() {
+    println!("发送消息至 Host");
     wasm::send_message_to_host("hello, host!".as_bytes()).unwrap();
 }
+
+static mut RECV_CHECK: u32 = 0;
 
 /// 设置接收 host 消息的回调函数，用于对 `low_level::wasm::set_message_callback!` 进行测试
 fn receive_message_from_host(msg: &[u8]) {
     println!("接收到 Host 消息：{:?}", msg);
 
     let expected = "hello, wasm!".as_bytes();
-    assert_eq!(expected, msg);
+    unsafe {
+        RECV_CHECK = if msg == expected { 1 } else { 0 };
+    }
 }
 
 set_message_callback!(receive_message_from_host);
+
+#[no_mangle]
+pub extern "C" fn get_receive_check() -> u32 {
+    unsafe { RECV_CHECK }
+}
 
 fn main() {}

@@ -22,8 +22,11 @@ pub fn send_message_to_host(msg: &[u8]) -> Result<()> {
         fn host_message_handler(msg: *const u8, msg_len: usize);
     }
 
-    // TODO: 应该通过调用 receive_message_from_wasm 函数将信息传送至 Host
-    todo!()
+    unsafe {
+        host_message_handler(msg.as_ptr(), msg.len());
+    }
+
+    Ok(())
 }
 
 /// 设置接受 Host 模块消息的回调函数。与 `low_level::host::LowLevelCtx::send_message_to_wasm`
@@ -46,7 +49,6 @@ macro_rules! set_message_callback {
     ($cb:ident) => {
         #[no_mangle]
         pub extern "C" fn __bc_low_level_host_message_handler(msg: *const u8, msg_len: usize) {
-            // TODO: 可以按照需要随意修改，此处只是示例
             let msg = unsafe {
                 std::slice::from_raw_parts(msg, msg_len)
             };
@@ -96,12 +98,4 @@ pub unsafe extern "C" fn canonical_abi_free(ptr: *mut u8, len: usize, align: usi
     }
     let layout = Layout::from_size_align_unchecked(len, align);
     alloc::dealloc(ptr, layout);
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-// TODO: 增加需要的测试，如验证回调是否可以正常触发
 }

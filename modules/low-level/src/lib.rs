@@ -15,17 +15,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod tests {
-    use super::*;
     use wasmtime::*;
     use wasmtime_wasi::sync::WasiCtxBuilder;
     use wasmtime_wasi::WasiCtx;
 
-    struct Context<T> {
-        store: Store<T>,
-        instance: Instance,
+    pub struct Context<T> {
+        pub store: Store<T>,
+        pub module: Module,
+        pub linker: Linker<T>,
     }
 
-    fn guest_prepare() -> Context<WasiCtx> {
+    pub fn guest_prepare() -> Context<WasiCtx> {
         let engine = Engine::default();
         let mut linker = Linker::new(&engine);
 
@@ -34,22 +34,23 @@ mod tests {
 
         // 创建 WASI 上下文
         let wasi = WasiCtxBuilder::new().build();
-        let mut store = Store::new(&engine, wasi);
+        let store = Store::new(&engine, wasi);
 
         // 创建 Module 并进行实例化
         let module = Module::from_file(store.engine(),
                                        "tests/guest/guest.wasm").unwrap();
-        let instance = linker.instantiate(&mut store, &module).unwrap();
 
-        Context { store, instance }
+        Context { store, module, linker }
     }
 
     /// 对测试用的 WASM guest 模块的 `alloc_signal_buffer` 进行测试
-    /// 若可通过测试，则说明 guest 模块可以正确的将信息通过内存块传递至 host
-    /// TODO: 如果有足够时间的话，可以按照此测试的形式，对 wasm 及 host 模块中的 API 设计单元测试
+    /// 若可通过测试，则说明 guest 模块可以正确的将信息通过内存块传递至 host，即相关测试模块有效
     #[test]
-    fn test_alloc_signal_buffer() {
-        let Context { mut store, instance } = guest_prepare();
+    fn check_test_guest() {
+        let Context { mut store, module, mut linker } = guest_prepare();
+        linker.func_wrap("__bc_low_level", "receive_message_from_wasm",
+                         |_: Caller<'_, _>, _: i32, _: i32| {}).unwrap();
+        let instance = linker.instantiate(&mut store, &module).unwrap();
 
         let alloc_signal_buffer =
             instance.get_typed_func::<(), u32, _>(&mut store, "alloc_signal_buffer").unwrap();
