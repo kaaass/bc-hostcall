@@ -12,21 +12,19 @@ pub type RpcForwardCallback =
     dyn Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
 
 pub struct RpcNode<T>
-where
-    T: adapter::SendMessageAdapter,
+    where T: Send + Sync + 'static,
 {
     serialize_ctx: SerializeCtx,
     imports: Option<RpcImports>,
-    exports: Option<RpcExports>,
+    exports: Option<RpcExports<T>>,
     nonce: u32,
     request_num: Mutex<Cell<u32>>,
     forward_cb: Option<Box<RpcForwardCallback>>,
-    sender: T,
+    data: T,
 }
 
 impl<T> RpcNode<T>
-where
-    T: adapter::SendMessageAdapter,
+    where T: Send + Sync + 'static,
 {
     /// 创建一个新的 RPC 节点
     ///
@@ -39,7 +37,7 @@ where
             nonce,
             request_num: Mutex::new(Cell::new(0)),
             forward_cb: None,
-            sender,
+            data: sender,
         }
     }
 
@@ -47,7 +45,7 @@ where
         self.imports = Some(imports);
     }
 
-    pub fn set_exports(&mut self, exports: RpcExports) {
+    pub fn set_exports(&mut self, exports: RpcExports<T>) {
         self.exports = Some(exports);
     }
 
@@ -58,7 +56,7 @@ where
         self.forward_cb = Some(Box::new(forward_cb));
     }
 
-    pub fn request(&self) -> RpcRequestCtx {
+    pub fn request(&self) -> RpcRequestCtx<T> {
         // 基于 `nonce` 生成一个唯一的 RPC 调用请求序列号 `seq_no`
         let request_num = self.request_num.lock().unwrap();
 
@@ -68,7 +66,7 @@ where
         drop(request_num);
 
         // 创建调用请求上下文
-        RpcRequestCtx::new(seq_no, &SerializeCtx, &self.sender)
+        RpcRequestCtx::new(seq_no, &SerializeCtx, &self.data)
     }
 
     fn handle_request(&self, seq_no: RpcSeqNo, func: &abi::FunctionIdent, args: &[u8]) -> Result<()> {
@@ -76,7 +74,7 @@ where
         let cb = exports.get_callback(func).ok_or(format!("no callback for {:?}", func))?;
 
         // 创建返回上下文
-        let ctx = RpcResponseCtx::new(seq_no, &self.serialize_ctx, &self.sender);
+        let ctx = RpcResponseCtx::new(seq_no, &self.serialize_ctx, &self.data);
 
         // 调用回调
         cb(&ctx, args).unwrap();
@@ -115,6 +113,7 @@ where
                 }
             }
             Message::Response(res) => {
+                // TODO 换成单一 cb
                 // 返回结果
                 let imports = self.imports.as_ref().ok_or(format!("no imports"))?;
                 let cb = imports.get_callback(func).ok_or(format!("no callback for {:?}", func))?;
@@ -138,6 +137,7 @@ mod tests {
     use std::cell::Cell;
     use std::sync::Arc;
     use std::sync::Mutex;
+    use crate::adapter::SendMessageAdapter;
 
     static mut MSG: Option<Vec<u8>> = None;
 
@@ -164,7 +164,7 @@ mod tests {
         let mut exports = RpcExports::new(func.hint.clone());
         let count: Arc<Mutex<Cell<i32>>> = Arc::new(Mutex::new(Cell::new(0)));
         let inner_count = count.clone();
-        exports.add_exports(func.clone(), Box::new(move |_: &'_ RpcResponseCtx<'_>, _: &'_ [u8]| {
+        exports.add_exports(func.clone(), Box::new(move |_: &'_ RpcResponseCtx<'_, _>, _: &'_ [u8]| {
             let count = inner_count.lock().unwrap();
             count.set(count.get() + 1);
             println!("test 被调用，count = {}", count.get());
@@ -173,7 +173,9 @@ mod tests {
         node.set_exports(exports);
 
         // 发送一个调用请求
-        node.request().send_request(func.clone(), vec![]).unwrap();
+        let req = node.request();
+        let msg = req.make_request(func.clone(), vec![]).unwrap();
+        req.data().send_message(&msg).unwrap();
 
         // 处理调用请求
         node.handle_message(unsafe { MSG.as_ref().unwrap() }).unwrap();

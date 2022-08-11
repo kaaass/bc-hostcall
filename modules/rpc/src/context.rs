@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 
 use serialize::SerializeCtx;
 
-use crate::{abi, adapter, Result, RpcSeqNo};
+use crate::{abi, Result, RpcSeqNo};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
@@ -38,22 +38,22 @@ impl RpcMessage {
 }
 
 /// RPC 函数调用请求的临时上下文，用于在相关函数回调中提供调用请求所需的 API
-pub struct RpcRequestCtx<'a> {
+pub struct RpcRequestCtx<'a, T> {
     seq_no: RpcSeqNo,
     serialize_ctx: &'a SerializeCtx,
-    sender: &'a dyn adapter::SendMessageAdapter,
+    data: &'a T,
 }
 
-impl<'a> RpcRequestCtx<'a> {
-    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, sender: &'a dyn adapter::SendMessageAdapter) -> Self {
+impl<'a, T> RpcRequestCtx<'a, T> {
+    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, data: &'a T) -> Self {
         RpcRequestCtx {
             seq_no,
             serialize_ctx,
-            sender,
+            data,
         }
     }
 
-    pub fn send_request(&self, func: abi::FunctionIdent, args: Vec<u8>) -> Result<()> {
+    pub fn make_request(&self, func: abi::FunctionIdent, args: Vec<u8>) -> Result<Vec<u8>> {
         // 拼接报文
         let msg = RpcMessage {
             seq_no: self.seq_no,
@@ -64,10 +64,7 @@ impl<'a> RpcRequestCtx<'a> {
         // 序列化
         let msg_bytes = self.serialize_ctx.serialize(&msg)?;
 
-        // 发送报文
-        self.sender.send_message(&msg_bytes)?;
-
-        Ok(())
+        Ok(msg_bytes)
     }
 
     pub fn serialize_ctx(&self) -> &SerializeCtx {
@@ -77,25 +74,29 @@ impl<'a> RpcRequestCtx<'a> {
     pub fn seq_no(&self) -> RpcSeqNo {
         self.seq_no
     }
+
+    pub fn data(&self) -> &T {
+        self.data
+    }
 }
 
 /// RPC 函数调用回应（真正进行函数调用的时刻）的临时上下文，用于在相关函数回调中提供返回调用结果所需的 API
-pub struct RpcResponseCtx<'a> {
+pub struct RpcResponseCtx<'a, T> {
     seq_no: RpcSeqNo,
     serialize_ctx: &'a SerializeCtx,
-    sender: &'a dyn adapter::SendMessageAdapter,
+    data: &'a T,
 }
 
-impl<'a> RpcResponseCtx<'a> {
-    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, sender: &'a dyn adapter::SendMessageAdapter) -> Self {
+impl<'a, T> RpcResponseCtx<'a, T> {
+    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, data: &'a T) -> Self {
         RpcResponseCtx {
             seq_no,
             serialize_ctx,
-            sender,
+            data,
         }
     }
 
-    pub fn send_response(&self, func: abi::FunctionIdent, result: Vec<u8>) -> Result<()> {
+    pub fn make_response(&self, func: abi::FunctionIdent, result: Vec<u8>) -> Result<Vec<u8>> {
         // 拼接报文
         let msg = RpcMessage {
             seq_no: self.seq_no,
@@ -106,10 +107,7 @@ impl<'a> RpcResponseCtx<'a> {
         // 序列化
         let msg_bytes = self.serialize_ctx.serialize(&msg)?;
 
-        // 发送报文
-        self.sender.send_message(&msg_bytes)?;
-
-        Ok(())
+        Ok(msg_bytes)
     }
 
     pub fn serialize_ctx(&self) -> &SerializeCtx {
@@ -118,6 +116,10 @@ impl<'a> RpcResponseCtx<'a> {
 
     pub fn seq_no(&self) -> RpcSeqNo {
         self.seq_no
+    }
+
+    pub fn data(&self) -> &T {
+        self.data
     }
 }
 
