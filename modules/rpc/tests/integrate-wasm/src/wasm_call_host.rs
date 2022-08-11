@@ -15,8 +15,8 @@ fn host_export_to_wasm(param: String) {
     let ctx = CTX.get().unwrap();
     let req = ctx.rpc_ctx.request();
     // 函数标识符
-    let mut func = abi::FunctionIdent::new("wasm_export_to_host");
-    func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
+    let mut func = abi::FunctionIdent::new("host_export_to_wasm");
+    func.set_hint(abi::LinkHint::Host);
     // 参数拼接
     let args = ArgsBuilder::new(req.serialize_ctx())
         .push(&param).unwrap()

@@ -10,6 +10,7 @@ use crate::MockHostContext;
 
 /// Host 内导出的函数
 fn host_export_to_wasm(param: String) -> String {
+    println!("返回：Hello {}, I'm a host!", param);
     format!("Hello {}, I'm a host!", param)
 }
 
@@ -69,7 +70,7 @@ mod tests {
 
     use super::*;
 
-    // FIXME: #[test]
+    #[test]
     fn test_host_export_to_wasm() {
         let Context { store, module, mut linker } = guest_prepare();
 
@@ -83,15 +84,28 @@ mod tests {
         // 初始化内部上下文
         let mut ctx = MockHostContext {
             rpc_ctx: RpcNode::new(SerializeCtx::new(), 0,
-                                  HostSendMessageAdapter::new(ll_ctx)),
+                                  HostSendMessageAdapter::new(ll_ctx.clone())),
         };
         // 注册导出模块
         let exports = init_exports();
         ctx.rpc_ctx.set_exports(exports);
         // 设置上下文
         CTX.set(ctx).unwrap();
-        // TODO: 初始化 wasm
-        let _ctx = guest_prepare();
-        // TODO: 运行 wasm 主函数
+
+        // 实例化 WASM
+        let mut store_guard = store_lock.lock().unwrap();
+        let store = store_guard.get_mut();
+        let instance = linker.instantiate(store, &module).unwrap();
+        drop(store_guard);
+        ll_ctx.attach(&instance).unwrap();
+
+        // 运行 main
+        let mut store = store_lock.lock().unwrap();
+        let main_func = instance.get_typed_func::<(), (), _>(store.get_mut(), "__bc_main").unwrap();
+        main_func.call(store.get_mut(), ()).unwrap();
+
+        // 调用
+        let trigger_call = instance.get_typed_func::<(), (), _>(store.get_mut(), "trigger_call").unwrap();
+        trigger_call.call(store.get_mut(), ()).unwrap();
     }
 }
