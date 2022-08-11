@@ -13,6 +13,7 @@ struct InstanceCtx {
     canonical_abi_free: TypedFunc<(i32, i32, i32), ()>,
     canonical_abi_realloc: TypedFunc<(i32, i32, i32, i32), i32>,
     host_message_handler: TypedFunc<(i32, i32), ()>,
+    wasm_poll: Option<TypedFunc<(), ()>>,
     memory: Memory,
 }
 
@@ -88,11 +89,14 @@ impl<T> LowLevelCtx<T>
             store.as_context_mut(), "canonical_abi_free")?;
         let host_message_handler = instance.get_typed_func(
             store.as_context_mut(), "__bc_low_level_host_message_handler")?;
+        let wasm_poll = instance.get_typed_func(
+            store.as_context_mut(), "__bc_low_level_wasm_poll").ok();
 
         *wasm_funcs = Some(InstanceCtx {
             canonical_abi_realloc,
             canonical_abi_free,
             host_message_handler,
+            wasm_poll,
             memory: instance.get_memory(store.as_context_mut(), "memory").unwrap(), // FIXME
         });
 
@@ -166,7 +170,7 @@ impl<T> LowLevelCtx<T>
         return result;
     }
 
-    pub fn send_message_to_wasm_with_store(&self, mut store: impl AsContextMut, msg: &[u8]) -> Result<()> {
+    fn send_message_to_wasm_with_store(&self, mut store: impl AsContextMut, msg: &[u8]) -> Result<()> {
         let mut instance_ctx = self.instance_ctx.lock().unwrap();
         let instance_ctx = instance_ctx.get_mut().as_ref().unwrap();
         let func_canonical_abi_free = &instance_ctx.canonical_abi_free;
@@ -187,6 +191,39 @@ impl<T> LowLevelCtx<T>
 
         // 释放消息内存
         func_canonical_abi_free.call(&mut store, (msg_ptr, msg_len, 1))?;
+
+        Ok(())
+    }
+
+    pub fn wasm_poll(&self) -> Result<()> {
+        // 如果有 oneshot_caller，说明是嵌套调用，则直接使用
+        let oneshot_caller = self.oneshot_caller.lock().unwrap();
+        let caller = oneshot_caller.replace(None);
+        drop(oneshot_caller);
+        if let Some(caller) = caller {
+            return self.wasm_poll_with_store(caller);
+        }
+
+        // 没有的话看看是否持有 Store
+        let temp_store = self.temp_store.lock().unwrap();
+        let mut store = temp_store.replace(None).ok_or("No available store!")?;
+
+        let result = self.wasm_poll_with_store(store.as_context_mut());
+
+        // 放回 store
+        temp_store.replace(Some(store));
+
+        return result;
+    }
+
+    fn wasm_poll_with_store(&self, mut store: impl AsContextMut) -> Result<()> {
+        let mut instance_ctx = self.instance_ctx.lock().unwrap();
+        let instance_ctx = instance_ctx.get_mut().as_ref().unwrap();
+        let func_wasm_poll = &instance_ctx.wasm_poll
+            .ok_or("No `wasm_poll` function exported!")?;
+
+        // 发送消息
+        func_wasm_poll.call(&mut store, ())?;
 
         Ok(())
     }
