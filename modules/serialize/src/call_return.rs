@@ -1,8 +1,7 @@
 //! 参数及其返回值等等与函数调用相关的序列化和反序列化
 
-use std::marker;
-
 use crate::{HostcallValue, Result, SerializeCtx};
+use serde::{Deserialize, Serialize};
 
 /// 用于构建可序列化的参数的数据结构，其内部应该维护一系列等待序列化的参数的引用
 ///
@@ -13,36 +12,43 @@ use crate::{HostcallValue, Result, SerializeCtx};
 /// use serialize::*;
 ///
 /// let ctx = SerializeCtx::new();
-/// let arg1 = "hello world";
+/// let arg1 = "hello world".to_string();
 /// let arg2 = 123i32;
 ///
-/// let args: Args = ArgsBuilder::new().push(&arg1)
-///                         .push(&arg2)
-///                         .build(&ctx).unwrap();
+/// let args: Vec<u8> = ArgsBuilder::new(&ctx).push(&arg1).unwrap()
+///                         .push(&arg2).unwrap()
+///                         .build().unwrap();
 /// ```
 pub struct ArgsBuilder<'a> {
-    // FIXME: 这个字段只是为了暂时允许编译器做 'a 的声明期检查，如果之后
-    //        有其他字段需要 'a 的话就可以把这个字段去掉
-    phantom: marker::PhantomData<&'a Self>,
+    args: InnerArgs,
+    ctx: &'a SerializeCtx,
 }
 
 impl<'a> ArgsBuilder<'a> {
-    pub fn new() -> Self {
-        // TODO
+    pub fn new(ctx: &'a SerializeCtx) -> Self {
         ArgsBuilder {
-            phantom: marker::PhantomData,
+            ctx,
+            args: InnerArgs {
+                arg_buffers: Vec::new(),
+            },
         }
     }
 
-    pub fn push<T: HostcallValue>(&mut self, value: &'a T) -> &mut Self {
-        // TODO
-        self
+    pub fn push<'b, T>(&mut self, value: &'b T) -> Result<&mut Self>
+        where T: HostcallValue<'b>,
+    {
+        self.args.arg_buffers.push(self.ctx.serialize(value)?.to_vec());
+        Ok(self)
     }
 
-    pub fn build(&self, ctx: &SerializeCtx) -> Result<Args<'a>> {
-        // TODO
-        Ok(Args { phantom: marker::PhantomData })
+    pub fn build(&self) -> Result<Vec<u8>> {
+        self.ctx.serialize(&self.args)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct InnerArgs {
+    arg_buffers: Vec<Vec<u8>>,
 }
 
 /// 用于描述已完成序列化的参数集合的数据结构，提供反序列化的 API
@@ -55,37 +61,34 @@ impl<'a> ArgsBuilder<'a> {
 ///
 /// let ctx = SerializeCtx::new();
 /// let expected = 0i32;
-/// let serialized = ArgsBuilder::new().push(&expected).build(&ctx).unwrap();
-/// let bytes = serialized.to_bytes();
+/// let bytes = ArgsBuilder::new(&ctx).push(&expected).unwrap()
+///                                 .build().unwrap();
 ///
 /// let args = Args::from_bytes(&ctx, &bytes).unwrap();
 /// let actual = args.get::<i32>(0).unwrap();
-/// assert_eq!(&expected, actual);
+/// assert_eq!(expected, actual);
 ///
-/// // FIXME: args.get::<i32>(1).unwrap_err();
+/// args.get::<i32>(1).unwrap_err();
 /// ```
 pub struct Args<'a> {
-    // FIXME: 这个字段只是为了暂时允许编译器做 'a 的声明期检查，如果之后
-    //        有其他字段需要 'a 的话就可以把这个字段去掉
-    phantom: marker::PhantomData<&'a Self>,
+    inner_args: InnerArgs,
+    ctx: &'a SerializeCtx,
 }
 
 impl<'a> Args<'a> {
-    pub fn from_bytes(ctx: &SerializeCtx, bytes: &'a [u8]) -> Result<Self> {
-        // TODO
-        Ok(Args { phantom: marker::PhantomData })
+    pub fn from_bytes(ctx: &'a SerializeCtx, bytes: &[u8]) -> Result<Self> {
+        Ok(Args {
+            inner_args: ctx.deserialize(bytes)?,
+            ctx
+        })
     }
 
-    pub fn to_bytes(&self) -> &'a [u8] {
-        // TODO
-        static MEM: [u8; 100] = [0u8; 100];
-        &MEM
-    }
-
-    pub fn get<T: HostcallValue>(&self, index: usize) -> Result<&T> {
-        // TODO
-        static MEM: [u8; 100] = [0u8; 100];
-        Ok(unsafe { std::mem::transmute(&MEM) })
+    pub fn get<'b, T>(&'b self, index: usize) -> Result<T>
+        where T: HostcallValue<'b>,
+    {
+        let args = &self.inner_args.arg_buffers;
+        let bytes = args.get(index).ok_or(format!("index {} out of range", index))?;
+        Ok(self.ctx.deserialize::<T>(bytes)?)
     }
 }
 
@@ -93,5 +96,19 @@ impl<'a> Args<'a> {
 mod tests {
     use super::*;
 
-// TODO: 有时间的话应该添加测试用例
+    #[test]
+    fn test_arg_serialize_deserialize() {
+        let ctx = SerializeCtx::new();
+        let arg1 = "hello world".to_string();
+        let arg2 = 123i32;
+        let bytes = ArgsBuilder::new(&ctx)
+            .push(&arg1).unwrap()
+            .push(&arg2).unwrap()
+            .build().unwrap();
+        let args = Args::from_bytes(&ctx, &bytes).unwrap();
+        let actual = args.get::<String>(0).unwrap();
+        assert_eq!(arg1, actual);
+        let actual = args.get::<i32>(1).unwrap();
+        assert_eq!(arg2, actual);
+    }
 }
