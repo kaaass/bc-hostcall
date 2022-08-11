@@ -21,27 +21,28 @@ use crate::{HostcallValue, Result, SerializeCtx};
 ///                         .build(&ctx).unwrap();
 /// ```
 pub struct ArgsBuilder<'a> {
-    // FIXME: 这个字段只是为了暂时允许编译器做 'a 的声明期检查，如果之后
-    //        有其他字段需要 'a 的话就可以把这个字段去掉
-    phantom: marker::PhantomData<&'a Self>,
+    args: Vec<&'a dyn HostcallValue>,
 }
 
 impl<'a> ArgsBuilder<'a> {
     pub fn new() -> Self {
         // TODO
-        ArgsBuilder {
-            phantom: marker::PhantomData,
-        }
+        ArgsBuilder { args: Vec::new() }
     }
 
     pub fn push<T: HostcallValue>(&mut self, value: &'a T) -> &mut Self {
-        // TODO
+        self.args.push(value);
         self
     }
 
-    pub fn build(&self, ctx: &SerializeCtx) -> Result<Args<'a>> {
-        // TODO
-        Ok(Args { phantom: marker::PhantomData })
+    pub fn build(&self, ctx: &SerializeCtx) -> Result<Args> {
+        let x = self.args[0];
+        let y = self.args.iter().map(|x| ctx.serialize(x)).collect();
+        Ok(Args::from_bytes(y))
+    }
+
+    pub fn get<T: HostcallValue>(&self, index: usize) -> Result<&T> {
+        return Ok(&self.args[index]);
     }
 }
 
@@ -64,28 +65,23 @@ impl<'a> ArgsBuilder<'a> {
 ///
 /// // FIXME: args.get::<i32>(1).unwrap_err();
 /// ```
-pub struct Args<'a> {
+pub struct Args {
     // FIXME: 这个字段只是为了暂时允许编译器做 'a 的声明期检查，如果之后
     //        有其他字段需要 'a 的话就可以把这个字段去掉
-    phantom: marker::PhantomData<&'a Self>,
+    // phantom: marker::PhantomData<&'a Self>,
+    bytes: Vec<u8>,
 }
 
-impl<'a> Args<'a> {
-    pub fn from_bytes(ctx: &SerializeCtx, bytes: &'a [u8]) -> Result<Self> {
+impl Args {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // TODO
-        Ok(Args { phantom: marker::PhantomData })
+        Ok(Args {
+            bytes: bytes.to_vec(),
+        })
     }
 
-    pub fn to_bytes(&self) -> &'a [u8] {
-        // TODO
-        static MEM: [u8; 100] = [0u8; 100];
-        &MEM
-    }
-
-    pub fn get<T: HostcallValue>(&self, index: usize) -> Result<&T> {
-        // TODO
-        static MEM: [u8; 100] = [0u8; 100];
-        Ok(unsafe { std::mem::transmute(&MEM) })
+    pub fn to_bytes(&self) -> &[u8] {
+        &self.bytes
     }
 }
 
@@ -93,5 +89,6 @@ impl<'a> Args<'a> {
 mod tests {
     use super::*;
 
-// TODO: 有时间的话应该添加测试用例
+    #[test]
+    fn args() {}
 }
