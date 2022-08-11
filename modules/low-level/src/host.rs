@@ -2,7 +2,7 @@
 
 use crate::Result;
 
-use wasmtime::{TypedFunc, Linker, Caller, Instance, Memory, Trap, Store};
+use wasmtime::{TypedFunc, Linker, Caller, Instance, Memory, Trap, Store, AsContextMut};
 use std::sync::{Arc, Mutex};
 use std::cell::Cell;
 use std::mem;
@@ -19,19 +19,23 @@ struct InstanceCtx {
 pub struct LowLevelCtx<T>
     where T: Send + Sync + 'static,
 {
-    store: Arc<Mutex<Cell<Store<T>>>>,
     instance_ctx: OptionWrapper<InstanceCtx>,
     message_cb: Option<Box<dyn Fn(&[u8]) -> () + Send + Sync + 'static>>,
+    /// 临时 caller，用来处理嵌套 call
+    oneshot_caller: OptionWrapper<Caller<'static, T>>,
+    /// 临时 store
+    temp_store: OptionWrapper<Store<T>>
 }
 
 impl<T> LowLevelCtx<T>
     where T: Send + Sync + 'static,
 {
-    pub fn new(store: Arc<Mutex<Cell<Store<T>>>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            store,
             instance_ctx: Mutex::new(Cell::new(None)),
             message_cb: None,
+            oneshot_caller: Mutex::new(Cell::new(None)),
+            temp_store: Mutex::new(Cell::new(None)),
         }
     }
 
@@ -51,8 +55,21 @@ impl<T> LowLevelCtx<T>
                                            msg_len as usize)
             };
 
+            // 保存 Caller
+            unsafe {
+                let temp_caller = self.oneshot_caller.lock().unwrap();
+                let caller: Caller<'static, T> = std::mem::transmute(caller);
+                temp_caller.replace(Some(caller));
+            }
+
             // 调用回调
             (self.message_cb.as_ref().unwrap())(msg);
+
+            // 丢弃 Caller，无论是否已经被消耗
+            {
+                let temp_caller = self.oneshot_caller.lock().unwrap();
+                temp_caller.replace(None);
+            }
         };
         linker.func_wrap("__bc_low_level", "receive_message_from_wasm", cb)?;
 
@@ -60,28 +77,38 @@ impl<T> LowLevelCtx<T>
     }
 
     /// 将 LowLevelCtx 与 wasmtime 实例绑定
-    pub fn attach(&self, instance: &Instance) -> Result<()> {
-        let mut store = self.store.lock().unwrap();
-
+    pub fn attach(&self, mut store: impl AsContextMut, instance: &Instance) -> Result<()> {
         // 准备发送消息所必要的函数。可以通过 `instance.get_typed_func` 获取到 WASM 内的处理函数
         let mut wasm_funcs = self.instance_ctx.lock().unwrap();
         let wasm_funcs = wasm_funcs.get_mut();
 
         let canonical_abi_realloc = instance.get_typed_func(
-            store.get_mut(), "canonical_abi_realloc")?;
+            store.as_context_mut(), "canonical_abi_realloc")?;
         let canonical_abi_free = instance.get_typed_func(
-            store.get_mut(), "canonical_abi_free")?;
+            store.as_context_mut(), "canonical_abi_free")?;
         let host_message_handler = instance.get_typed_func(
-            store.get_mut(), "__bc_low_level_host_message_handler")?;
+            store.as_context_mut(), "__bc_low_level_host_message_handler")?;
 
         *wasm_funcs = Some(InstanceCtx {
             canonical_abi_realloc,
             canonical_abi_free,
             host_message_handler,
-            memory: instance.get_memory(store.get_mut(), "memory").unwrap(), // FIXME
+            memory: instance.get_memory(store.as_context_mut(), "memory").unwrap(), // FIXME
         });
 
         Ok(())
+    }
+
+    /// 把 Store 移入
+    pub fn move_store(&self, store: Store<T>) {
+        let temp_store = self.temp_store.lock().unwrap();
+        temp_store.replace(Some(store));
+    }
+
+    /// 取回移入的 Store
+    pub fn take_store(&self) -> Option<Store<T>> {
+        let temp_store = self.temp_store.lock().unwrap();
+        temp_store.take()
     }
 
     /// 设置接受 WASM 模块消息的回调函数。与 `low_level::wasm::send_message_to_host` 函数
@@ -119,8 +146,27 @@ impl<T> LowLevelCtx<T>
     /// ```
     ///
     pub fn send_message_to_wasm(&self, msg: &[u8]) -> Result<()> {
-        let mut store = self.store.lock().unwrap();
+        // 如果有 oneshot_caller，说明是嵌套调用，则直接使用
+        let oneshot_caller = self.oneshot_caller.lock().unwrap();
+        let caller = oneshot_caller.replace(None);
+        drop(oneshot_caller);
+        if let Some(caller) = caller {
+            return self.send_message_to_wasm_with_store(caller, msg);
+        }
 
+        // 没有的话看看是否持有 Store
+        let temp_store = self.temp_store.lock().unwrap();
+        let mut store = temp_store.replace(None).ok_or("No available store!")?;
+
+        let result = self.send_message_to_wasm_with_store(store.as_context_mut(), msg);
+
+        // 放回 store
+        temp_store.replace(Some(store));
+
+        return result;
+    }
+
+    pub fn send_message_to_wasm_with_store(&self, mut store: impl AsContextMut, msg: &[u8]) -> Result<()> {
         let mut instance_ctx = self.instance_ctx.lock().unwrap();
         let instance_ctx = instance_ctx.get_mut().as_ref().unwrap();
         let func_canonical_abi_free = &instance_ctx.canonical_abi_free;
@@ -130,17 +176,17 @@ impl<T> LowLevelCtx<T>
         // 在 WASM 内分配消息内存
         let msg_len = msg.len() as i32;
         let msg_ptr = func_canonical_abi_realloc
-            .call(store.get_mut(), (0, 0, 1, msg_len))?;
+            .call(&mut store, (0, 0, 1, msg_len))?;
 
         // 将消息复制到 WASM 内存中
         let memory = &instance_ctx.memory;
-        store_many(memory.data_mut(store.get_mut()), msg_ptr, msg)?;
+        store_many(memory.data_mut(&mut store), msg_ptr, msg)?;
 
         // 发送消息
-        func_host_message_handler.call(store.get_mut(), (msg_ptr, msg_len))?;
+        func_host_message_handler.call(&mut store, (msg_ptr, msg_len))?;
 
         // 释放消息内存
-        func_canonical_abi_free.call(store.get_mut(), (msg_ptr, msg_len, 1))?;
+        func_canonical_abi_free.call(&mut store, (msg_ptr, msg_len, 1))?;
 
         Ok(())
     }
@@ -183,42 +229,39 @@ mod tests {
 
     #[test]
     fn test_send_message_to_wasm() {
-        let Context { store, module, mut linker } = guest_prepare();
+        let Context { mut store, module, mut linker } = guest_prepare();
 
         // 创建 Ctx
-        let store_lock = Arc::new(Mutex::new(Cell::new(store)));
-        let ctx = LowLevelCtx::new(store_lock.clone());
+        let ctx = LowLevelCtx::new();
         let ctx = Arc::new(ctx);
 
         // Linker
         ctx.clone().add_to_linker(&mut linker).unwrap();
 
         // 实例化
-        let mut store = store_lock.lock().unwrap();
-        let instance = linker.instantiate(store.get_mut(), &module).unwrap();
-        drop(store);
-        ctx.attach(&instance).unwrap();
+        let instance = linker.instantiate(&mut store, &module).unwrap();
+        ctx.attach(&mut store, &instance).unwrap();
 
         // 发送消息
         let msg = "hello, wasm!".as_bytes();
+        ctx.move_store(store);
         ctx.send_message_to_wasm(msg).unwrap();
+        let mut store = ctx.take_store().unwrap();
 
         // 检查结果
-        let mut store = store_lock.lock().unwrap();
         let check = instance
-            .get_typed_func::<(), u32, _>(store.get_mut(), "get_receive_check")
+            .get_typed_func::<(), u32, _>(&mut store, "get_receive_check")
             .unwrap();
 
-        assert_eq!(1, check.call(store.get_mut(), ()).unwrap());
+        assert_eq!(1, check.call(&mut store, ()).unwrap());
     }
 
     #[test]
     fn test_receive_message_from_wasm() {
-        let Context { store, module, mut linker } = guest_prepare();
+        let Context { mut store, module, mut linker } = guest_prepare();
 
         // 创建 Ctx
-        let store_lock = Arc::new(Mutex::new(Cell::new(store)));
-        let mut ctx = LowLevelCtx::new(store_lock.clone());
+        let mut ctx = LowLevelCtx::new();
         ctx.set_message_callback(|msg| {
             println!("接收到 WASM 消息：{:?}", msg);
             assert_eq!("hello, host!".as_bytes(), msg);
@@ -229,18 +272,13 @@ mod tests {
         ctx.clone().add_to_linker(&mut linker).unwrap();
 
         // 实例化
-        let mut store_guard = store_lock.lock().unwrap();
-        let store = store_guard.get_mut();
-        let instance = linker.instantiate(store, &module).unwrap();
-        drop(store_guard);
-        ctx.attach(&instance).unwrap();
+        let instance = linker.instantiate(&mut store, &module).unwrap();
+        ctx.attach(&mut store, &instance).unwrap();
 
         // 触发消息发送
-        let mut store = store_lock.lock().unwrap();
-
         let check = instance
-            .get_typed_func::<(), (), _>(store.get_mut(), "test_send_message")
+            .get_typed_func::<(), (), _>(&mut store, "test_send_message")
             .unwrap();
-        check.call(store.get_mut(), ()).unwrap()
+        check.call(&mut store, ()).unwrap()
     }
 }

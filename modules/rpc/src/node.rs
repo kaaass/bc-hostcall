@@ -1,36 +1,43 @@
 //! Rpc 节点的接口实现
 
+use std::cell::Cell;
+use std::sync::Mutex;
+
+use crate::{abi, adapter, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcResultCtx};
 use serialize::SerializeCtx;
-use crate::{RpcImports, RpcExports, RpcRequestCtx, Result, abi, adapter};
 
 pub type RpcSeqNo = u64;
 
-pub type RpcForwardCallback = dyn Fn(RpcSeqNo, abi::FunctionIdent, &[u8])
-    -> Result<()> + Sync + Send + 'static;
+pub type RpcForwardCallback =
+    dyn Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
 
 pub struct RpcNode<T>
-    where T: adapter::SendMessageAdapter
+where
+    T: adapter::SendMessageAdapter,
 {
     serialize_ctx: SerializeCtx,
     imports: Option<RpcImports>,
     exports: Option<RpcExports>,
-    nonce: u64,
+    nonce: u32,
+    request_num: Mutex<Cell<u32>>,
     forward_cb: Option<Box<RpcForwardCallback>>,
     sender: T,
 }
 
 impl<T> RpcNode<T>
-    where T: adapter::SendMessageAdapter
+where
+    T: adapter::SendMessageAdapter,
 {
     /// 创建一个新的 RPC 节点
     ///
     /// `nonce` 为该节点的唯一标识，用于标识该节点的调用请求和调用结果
-    pub fn new(serialize_ctx: SerializeCtx, nonce: u64, sender: T) -> Self {
+    pub fn new(serialize_ctx: SerializeCtx, nonce: u32, sender: T) -> Self {
         RpcNode {
             serialize_ctx,
             imports: None,
             exports: None,
             nonce,
+            request_num: Mutex::new(Cell::new(0)),
             forward_cb: None,
             sender,
         }
@@ -45,19 +52,39 @@ impl<T> RpcNode<T>
     }
 
     pub fn set_forward_cb<CB>(&mut self, forward_cb: CB)
-        where CB: Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static
+    where
+        CB: Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static,
     {
         self.forward_cb = Some(Box::new(forward_cb));
     }
 
     pub fn request(&self) -> RpcRequestCtx {
-        // TODO: 基于 `nonce` 生成一个唯一的 RPC 调用请求序列号 `seq_no`
-        let seq_no = 0;
-        RpcRequestCtx::new(seq_no, &SerializeCtx)
+        // 基于 `nonce` 生成一个唯一的 RPC 调用请求序列号 `seq_no`
+        let request_num = self.request_num.lock().unwrap();
+
+        let seq_no =
+            (self.nonce as u64).checked_shl(32).unwrap() + request_num.get() as u64;
+        request_num.set(request_num.get() + 1);
+        drop(request_num);
+
+        // 创建调用请求上下文
+        RpcRequestCtx::new(seq_no, &SerializeCtx, &self.sender)
     }
 
-    pub fn handle_message(&self, msg: &[u8]) -> Result<()> {
-        // TODO: 处理接收到的报文
+    fn handle_request(&self, seq_no: RpcSeqNo, func: &abi::FunctionIdent, args: &[u8]) -> Result<()> {
+        let exports = self.exports.as_ref().ok_or(format!("no exports"))?;
+        let cb = exports.get_callback(func).ok_or(format!("no callback for {:?}", func))?;
+
+        // 创建返回上下文
+        let ctx = RpcResponseCtx::new(seq_no, &self.serialize_ctx, &self.sender);
+
+        // 调用回调
+        cb(&ctx, args).unwrap();
+
+        Ok(())
+    }
+
+    pub fn handle_message(&self, raw_msg: &[u8]) -> Result<()> {
         // 对于收到的报文，首先要将其解码（可以反序列化为 `RpcMessage` 之类的）。
         // 因为这一次解码主要是用来判断如何处理报文的，所以不用反序列化详细的数据
         // （比如调用参数、返回值）。只需要获得报文的类型（调用请求、返回结果）和
@@ -68,19 +95,49 @@ impl<T> RpcNode<T>
         // - 如果报文是返回结果，并且没有发生错误，则需要调用 `imports` 中的对
         //   应的回调。如果没有对应的回调，则返回错误。
         // - 如果报文是返回结果，并且发生错误，则返回错误。
-        todo!();
+        let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
+        let inner = msg.message();
+        let func = msg.func();
+
+        match inner {
+            Message::Request(args) => {
+                // 调用请求
+                let result = self.handle_request(msg.seq_no(), &func, &*args);
+
+                match result {
+                    Ok(_) => Ok(()),
+                    Err(_) => {
+                        // 如果没有对应的回调，则调用 `forward_cb` 把这个报文转发给其他模块
+                        let forward_cb =
+                            self.forward_cb.as_ref().ok_or(format!("no forward_cb"))?;
+                        forward_cb(msg.seq_no(), func.clone(), raw_msg)
+                    }
+                }
+            }
+            Message::Response(res) => {
+                // 返回结果
+                let imports = self.imports.as_ref().ok_or(format!("no imports"))?;
+                let cb = imports.get_callback(func).ok_or(format!("no callback for {:?}", func))?;
+
+                // 创建返回上下文
+                let ctx = RpcResultCtx::new(msg.seq_no(), &self.serialize_ctx);
+
+                // 调用回调
+                cb(&ctx, &*res)
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::abi::LinkHint::Host;
     use super::*;
+    use crate::abi::LinkHint::Host;
 
+    use crate::RpcResponseCtx;
+    use std::cell::Cell;
     use std::sync::Arc;
     use std::sync::Mutex;
-    use std::cell::Cell;
-    use crate::RpcResponseCtx;
 
     static mut MSG: Option<Vec<u8>> = None;
 
@@ -115,13 +172,13 @@ mod tests {
         }));
         node.set_exports(exports);
 
-        // FIXME: 发送一个调用请求
-        // node.request().send_request(func.clone(), &[]).unwrap();
+        // 发送一个调用请求
+        node.request().send_request(func.clone(), vec![]).unwrap();
 
-        // FIXME: 处理调用请求
-        // node.handle_message(unsafe { MSG.as_ref().unwrap() }).unwrap();
+        // 处理调用请求
+        node.handle_message(unsafe { MSG.as_ref().unwrap() }).unwrap();
 
         // 检验结果
-        // assert_eq!(1, count.lock().unwrap().get());
+        assert_eq!(1, count.lock().unwrap().get());
     }
 }

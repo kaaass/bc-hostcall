@@ -1,7 +1,9 @@
 //! 函数调用相关的 ABI 定义，用于定位函数符号、检验调用数据等
 
+use serde::{Serialize, Deserialize};
+
 /// 链接函数时提供给链接器的提示
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LinkHint {
     /// 链接目标为 Host 端实现函数
     Host,
@@ -12,7 +14,7 @@ pub enum LinkHint {
 }
 
 /// 函数标识符，用于提供链接器以确定调用的目标函数
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FunctionIdent {
     pub name: String,
     pub hint: LinkHint,

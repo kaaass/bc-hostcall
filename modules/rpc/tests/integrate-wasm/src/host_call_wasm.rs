@@ -1,10 +1,8 @@
 //! Wasm 导出函数、Host 调用函数的函数导出部分
 
-use rpc::{Result, RpcExports, RpcNode, RpcResponseCtx};
+use rpc::{Result, RpcExports, RpcResponseCtx};
 use rpc::abi;
-use serialize::{Args, SerializeCtx};
-
-use crate::MockWasmContext;
+use serialize::Args;
 
 /// Wasm 内导出的函数
 fn wasm_export_to_host(param: String) -> String {
@@ -22,6 +20,9 @@ fn wasm_export_to_host(param: String) -> String {
 ///
 /// 实际生成的函数应该是异步的并且使用异步模块的 Context。
 fn __bc_wrapper_wasm_export_to_host(resp: &RpcResponseCtx, args: &[u8]) -> Result<()> {
+    // 函数标识符
+    let mut func = abi::FunctionIdent::new("wasm_export_to_host");
+    func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
     // 参数解析
     let args = Args::from_bytes(resp.serialize_ctx(), args)?;
     let arg0_param: String = args.get::<String>(0).unwrap().clone();
@@ -30,7 +31,7 @@ fn __bc_wrapper_wasm_export_to_host(resp: &RpcResponseCtx, args: &[u8]) -> Resul
     // 序列化结果
     let serialized_result = resp.serialize_ctx().serialize(&result)?;
     // 结果回送
-    resp.send_response(serialized_result.as_ref())?;
+    resp.send_response(func, serialized_result)?;
     // 完成调用后，此返回信息应该已被送入 Host 处的消息队列 rx_queue。但在本示例中应该会
     // 直接被分发至 `wasm_export_to_host_return` 函数。
     Ok(())

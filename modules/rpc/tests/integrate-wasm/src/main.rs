@@ -5,7 +5,6 @@
 use std::fmt::Debug;
 
 use rpc::RpcNode;
-use rpc::abi;
 use serialize::SerializeCtx;
 use rpc::adapter::WasmSendMessageAdapter;
 
@@ -41,18 +40,19 @@ pub(crate) mod __bc {
 
     pub static CTX: OnceCell<MockWasmContext> = OnceCell::new();
 
-    // use low_level::set_message_callback;
-    //
-    // fn __bc_message_callback(msg: &[u8]) {
-    //     println!("接收到 Host 消息：{:?}", msg);
-    //
-    //     let ctx = CTX.get().unwrap();
-    //     ctx.rpc_ctx.handle_message(msg);
-    // }
-    //
-    // set_message_callback!(__bc_message_callback);
+    use low_level::set_message_callback;
 
-    pub fn main() {
+    fn __bc_message_callback(msg: &[u8]) {
+        println!("接收到 Host 消息：{:?}", msg);
+
+        let ctx = CTX.get().unwrap();
+        ctx.rpc_ctx.handle_message(msg).unwrap();
+    }
+
+    set_message_callback!(__bc_message_callback);
+
+    #[no_mangle]
+    pub extern "C" fn __bc_main() {
         // 初始化内部上下文
         let mut ctx = MockWasmContext {
             rpc_ctx: RpcNode::new(SerializeCtx::new(), 123123, WasmSendMessageAdapter::new()),
@@ -72,6 +72,5 @@ pub(crate) mod __bc {
 }
 
 fn main() {
-    use __bc;
-    __bc::main();
+    __bc::__bc_main();
 }

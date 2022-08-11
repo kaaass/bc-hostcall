@@ -28,7 +28,7 @@ fn wasm_export_to_host(ctx: &MockHostContext, param: String) {
         .push(&param).unwrap()
         .build().unwrap();
     // 发送消息
-    req.send_request(func, &args).unwrap();
+    req.send_request(func, args).unwrap();
     // 完成上述操作后，应该已经调用了 `__bc_wrapper_wasm_export_to_host` 并停止
     // 在异步调用 `wasm_export_to_host` 之前。此时就等待返回报文触发
     // `wasm_export_to_host_return` 回调。如果已经支持异步的话，则此处是在 await
@@ -47,7 +47,7 @@ static CTX: OnceCell<MockHostContext> = OnceCell::new();
 
 fn lowlevel_callback(data: &[u8]) {
     let ctx = CTX.get().unwrap();
-    ctx.rpc_ctx.handle_message(data);
+    ctx.rpc_ctx.handle_message(data).unwrap();
 }
 
 fn init_imports() -> RpcImports {
@@ -60,8 +60,7 @@ fn init_imports() -> RpcImports {
 }
 
 mod tests {
-    use std::cell::Cell;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc};
     use low_level::host::LowLevelCtx;
     use rpc::adapter::HostSendMessageAdapter;
 
@@ -69,13 +68,12 @@ mod tests {
 
     use super::*;
 
-    // FIXME: #[test]
+    #[test]
     fn test_wasm_export_to_host() {
-        let Context { store, module, mut linker } = guest_prepare();
+        let Context { mut store, module, mut linker } = guest_prepare();
 
         // 初始化 Lowlevel
-        let store_lock = Arc::new(Mutex::new(Cell::new(store)));
-        let mut ll_ctx = LowLevelCtx::new(store_lock.clone());
+        let mut ll_ctx = LowLevelCtx::new();
         ll_ctx.set_message_callback(lowlevel_callback);
         let ll_ctx = Arc::new(ll_ctx);
         ll_ctx.clone().add_to_linker(&mut linker).unwrap();
@@ -83,17 +81,26 @@ mod tests {
         // 初始化内部上下文
         let mut ctx = MockHostContext {
             rpc_ctx: RpcNode::new(SerializeCtx::new(), 0,
-                                  HostSendMessageAdapter::new(ll_ctx)),
+                                  HostSendMessageAdapter::new(ll_ctx.clone())),
         };
         // 注册导入模块
         let imports = init_imports();
         ctx.rpc_ctx.set_imports(imports);
         // 设置上下文
         CTX.set(ctx).unwrap();
-        // TODO: 初始化 wasm
-        let _ctx = guest_prepare();
+
+        // 实例化 WASM
+        let instance = linker.instantiate(&mut store, &module).unwrap();
+        ll_ctx.attach(&mut store, &instance).unwrap();
+
+        // 运行 main
+        let main_func = instance.get_typed_func::<(), (), _>(&mut store, "__bc_main").unwrap();
+        main_func.call(&mut store, ()).unwrap();
+
         // 调用
-        // TODO: let ctx = CTX.get().unwrap();
-        //       wasm_export_to_host(&ctx, "host".to_string());
+        let ctx = CTX.get().unwrap();
+        ll_ctx.move_store(store);
+        wasm_export_to_host(&ctx, "host".to_string());
+        // take out store
     }
 }

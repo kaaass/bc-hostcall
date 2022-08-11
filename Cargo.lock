@@ -1012,6 +1012,7 @@ name = "rpc"
 version = "0.1.0"
 dependencies = [
  "low-level",
+ "serde",
  "serialize",
 ]
 

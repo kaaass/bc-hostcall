@@ -33,7 +33,9 @@ mod tests {
         wasmtime_wasi::add_to_linker(&mut linker, |s| s).unwrap();
 
         // 创建 WASI 上下文
-        let wasi = WasiCtxBuilder::new().build();
+        let wasi = WasiCtxBuilder::new()
+            .inherit_stdio()
+            .build();
         let store = Store::new(&engine, wasi);
 
         // 创建 Module 并进行实例化

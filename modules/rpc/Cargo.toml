@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 low-level = { path = "../low-level" }
 serialize = { path = "../serialize" }
+serde = { version = "1.0.143", features = ["derive"] }
+
+[dev-dependencies]
+
