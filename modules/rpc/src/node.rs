@@ -11,6 +11,9 @@ pub type RpcSeqNo = u64;
 pub type RpcForwardCallback =
     dyn Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
 
+pub type RpcResultCallback =
+    dyn Fn(&RpcResultCtx, &[u8]) -> Result<()> + Sync + Send + 'static;
+
 pub struct RpcNode<T>
     where T: Send + Sync + 'static,
 {
@@ -20,6 +23,7 @@ pub struct RpcNode<T>
     nonce: u32,
     request_num: Mutex<Cell<u32>>,
     forward_cb: Option<Box<RpcForwardCallback>>,
+    result_cb: Option<Box<RpcResultCallback>>,
     data: T,
 }
 
@@ -37,6 +41,7 @@ impl<T> RpcNode<T>
             nonce,
             request_num: Mutex::new(Cell::new(0)),
             forward_cb: None,
+            result_cb: None,
             data: sender,
         }
     }
@@ -54,6 +59,13 @@ impl<T> RpcNode<T>
         CB: Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static,
     {
         self.forward_cb = Some(Box::new(forward_cb));
+    }
+
+    pub fn set_result_cb<CB>(&mut self, result_cb: CB)
+    where
+        CB: Fn(&RpcResultCtx, &[u8]) -> Result<()> + Sync + Send + 'static,
+    {
+        self.result_cb = Some(Box::new(result_cb));
     }
 
     pub fn request(&self) -> RpcRequestCtx<T> {
@@ -90,8 +102,7 @@ impl<T> RpcNode<T>
         // - 如果报文是调用请求，则需要调用 `exports` 中的对应的回调。如果没有
         //   对应的回调，则调用 `forward_cb` 把这个报文转发给其他模块。如果没
         //   有定义 `forward_cb` 则失败（发送一个返回结果发生错误报文）。
-        // - 如果报文是返回结果，并且没有发生错误，则需要调用 `imports` 中的对
-        //   应的回调。如果没有对应的回调，则返回错误。
+        // - 如果报文是返回结果，并且没有发生错误，则需要调用回调。
         // - 如果报文是返回结果，并且发生错误，则返回错误。
         let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
         let inner = msg.message();
@@ -113,16 +124,11 @@ impl<T> RpcNode<T>
                 }
             }
             Message::Response(res) => {
-                // TODO 换成单一 cb
                 // 返回结果
-                let imports = self.imports.as_ref().ok_or(format!("no imports"))?;
-                let cb = imports.get_callback(func).ok_or(format!("no callback for {:?}", func))?;
-
-                // 创建返回上下文
+                let result_cb =
+                    self.result_cb.as_ref().ok_or(format!("no result_cb"))?;
                 let ctx = RpcResultCtx::new(msg.seq_no(), &self.serialize_ctx);
-
-                // 调用回调
-                cb(&ctx, &*res)
+                result_cb(&ctx, &*res)
             }
         }
     }

@@ -1,8 +1,8 @@
 //! `entry` 模块主要的用途是维护某一个 `RpcNode` 具有的导入、导出函数表。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::{abi, Result, RpcResponseCtx, RpcResultCtx};
+use crate::{abi, Result, RpcResponseCtx};
 
 /// 导出函数的回调。第一个参数为发送返回结果的 RPC 上下文，第二个参数为反序列化前的参数。
 pub type RpcExportCallback<T> = dyn Fn(&RpcResponseCtx<T>, &[u8]) -> Result<()> + Sync + Send + 'static;
@@ -45,29 +45,26 @@ impl<T> RpcExports<T> {
 }
 
 /// 导出函数的回调。第一个参数为发送返回结果的 RPC 上下文，第二个参数为反序列化前的参数。
-pub type RpcImportCallback = dyn Fn(&RpcResultCtx, &[u8]) -> Result<()> + Sync + Send + 'static;
 
 /// 导入函数表
 pub struct RpcImports {
-    imports_map: HashMap<abi::FunctionIdent, Box<RpcImportCallback>>,
+    imports_set: HashSet<abi::FunctionIdent>,
 }
 
 impl RpcImports {
     pub fn new() -> Self {
         Self {
-            imports_map: HashMap::new(),
+            imports_set: HashSet::new(),
         }
     }
 
     /// 添加一个导入函数到导入表
-    pub fn add_imports<CB>(&mut self, func: abi::FunctionIdent, cb: CB)
-        where CB: Fn(&RpcResultCtx, &[u8]) -> Result<()> + Sync + Send + 'static
-    {
-        self.imports_map.insert(func, Box::new(cb));
+    pub fn add_imports<CB>(&mut self, func: abi::FunctionIdent) {
+        self.imports_set.insert(func);
     }
 
     /// 根据链接提示在当前导入表中查找回调函数
-    pub fn get_callback(&self, func: &abi::FunctionIdent) -> Option<&RpcImportCallback> {
-        self.imports_map.get(func).map(|cb| &**cb)
+    pub fn check(&self, func: &abi::FunctionIdent) -> bool {
+        self.imports_set.contains(func)
     }
 }
