@@ -1,6 +1,7 @@
 //! Rpc 节点的接口实现
 
-use std::cell::RefCell;
+use std::cell::Cell;
+use std::sync::Mutex;
 
 use crate::{abi, adapter, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcResultCtx};
 use serialize::SerializeCtx;
@@ -18,7 +19,7 @@ where
     imports: Option<RpcImports>,
     exports: Option<RpcExports>,
     nonce: u32,
-    request_num: RefCell<u32>,
+    request_num: Mutex<Cell<u32>>,
     forward_cb: Option<Box<RpcForwardCallback>>,
     sender: T,
 }
@@ -36,7 +37,7 @@ where
             imports: None,
             exports: None,
             nonce,
-            request_num: RefCell::new(0),
+            request_num: Mutex::new(Cell::new(0)),
             forward_cb: None,
             sender,
         }
@@ -59,9 +60,12 @@ where
 
     pub fn request(&self) -> RpcRequestCtx {
         // 基于 `nonce` 生成一个唯一的 RPC 调用请求序列号 `seq_no`
+        let request_num = self.request_num.lock().unwrap();
+
         let seq_no =
-            (self.nonce as u64).checked_shl(32).unwrap() + *self.request_num.borrow() as u64;
-        *self.request_num.borrow_mut() += 1;
+            (self.nonce as u64).checked_shl(32).unwrap() + request_num.get() as u64;
+        request_num.set(request_num.get() + 1);
+        drop(request_num);
 
         // 创建调用请求上下文
         RpcRequestCtx::new(seq_no, &SerializeCtx, &self.sender)
