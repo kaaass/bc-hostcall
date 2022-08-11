@@ -11,3 +11,6 @@ cd $base_dir || exit
 
 # rpc 模块
 ./modules/rpc/tests/integrate-wasm/build.sh
+
+# async-api 模块
+./modules/async-api/tests/unittest-future/build.sh

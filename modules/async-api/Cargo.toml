@@ -6,5 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = "1.20.1"
+tokio = { version = "1.20.1", features = ["full"] }
 rpc = { path = "../rpc" }
+low-level = { path = "../low-level" }
+
+[dev-dependencies]
+wasmtime = "0.39.1"
+wasmtime-wasi = "0.39.1"
