@@ -89,13 +89,13 @@ impl<T> LowLevelCtx<T>
     ///
     /// ## 使用示例
     ///
-    /// ```no_run
+    /// ```ignore
     /// use low_level::host::LowLevelCtx;
     /// fn receive_message_from_wasm(msg: &[u8]) {
     ///    println!("接收到 WASM 消息：{:?}", msg);
     /// }
     ///
-    /// let mut ctx = LowLevelCtx::new();
+    /// let mut ctx = LowLevelCtx::new(...);
     /// // 绑定 wasmtime 实例 ...
     /// ctx.set_message_callback(receive_message_from_wasm);
     /// ```
@@ -110,10 +110,10 @@ impl<T> LowLevelCtx<T>
     ///
     /// ## 使用示例
     ///
-    /// ```
+    /// ```ignore
     /// use low_level::host::LowLevelCtx;
     ///
-    /// let ctx = LowLevelCtx::new();
+    /// let ctx = LowLevelCtx::new(...);
     /// // 绑定 wasmtime 实例 ...
     /// ctx.send_message_to_wasm("hello wasm".as_bytes()).unwrap();
     /// ```
