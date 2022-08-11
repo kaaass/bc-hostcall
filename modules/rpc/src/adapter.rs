@@ -35,21 +35,28 @@ mod wasm {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod host {
+    use std::sync::Arc;
     use low_level::host::LowLevelCtx;
 
     use super::*;
 
-    pub struct HostSendMessageAdapter {
-        ctx: LowLevelCtx,
+    pub struct HostSendMessageAdapter<T>
+        where T: Send + Sync + 'static,
+    {
+        ctx: Arc<LowLevelCtx<T>>,
     }
 
-    impl<'a> HostSendMessageAdapter {
-        pub fn new(ctx: LowLevelCtx) -> Self {
+    impl<'a, T> HostSendMessageAdapter<T>
+        where T: Send + Sync + 'static,
+    {
+        pub fn new(ctx: Arc<LowLevelCtx<T>>) -> Self {
             HostSendMessageAdapter { ctx }
         }
     }
 
-    impl<'a> SendMessageAdapter for HostSendMessageAdapter {
+    impl<'a, T> SendMessageAdapter for HostSendMessageAdapter<T>
+        where T: Send + Sync + 'static,
+    {
         fn send_message(&self, message: &[u8]) -> Result<()> {
             self.ctx.send_message_to_wasm(message)
         }

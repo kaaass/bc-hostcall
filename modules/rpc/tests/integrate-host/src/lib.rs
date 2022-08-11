@@ -4,6 +4,7 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use std::fmt::Debug;
+use wasmtime_wasi::WasiCtx;
 
 use rpc::{RpcNode, adapter::HostSendMessageAdapter};
 
@@ -11,7 +12,7 @@ mod host_call_wasm;
 mod wasm_call_host;
 
 pub struct MockHostContext {
-    rpc_ctx: RpcNode<HostSendMessageAdapter>,
+    rpc_ctx: RpcNode<HostSendMessageAdapter<WasiCtx>>,
 }
 
 impl Debug for MockHostContext {
@@ -27,7 +28,8 @@ mod utils {
 
     pub struct Context<T> {
         pub store: Store<T>,
-        pub instance: Instance,
+        pub module: Module,
+        pub linker: Linker<T>,
     }
 
     pub fn guest_prepare() -> Context<WasiCtx> {
@@ -39,13 +41,12 @@ mod utils {
 
         // 创建 WASI 上下文
         let wasi = WasiCtxBuilder::new().build();
-        let mut store = Store::new(&engine, wasi);
+        let store = Store::new(&engine, wasi);
 
         // 创建 Module 并进行实例化
         let module = Module::from_file(store.engine(),
                                        "../integrate-wasm/integrate-wasm.wasm").unwrap();
-        let instance = linker.instantiate(&mut store, &module).unwrap();
 
-        Context { store, instance }
+        Context { store, module, linker }
     }
 }

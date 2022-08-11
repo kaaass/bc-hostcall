@@ -57,17 +57,26 @@ fn init_exports() -> RpcExports {
 }
 
 mod tests {
+    use std::cell::Cell;
+    use std::sync::{Arc, Mutex};
     use low_level::host::LowLevelCtx;
+    use rpc::adapter::HostSendMessageAdapter;
 
-    use crate::utils::guest_prepare;
+    use crate::utils::*;
 
     use super::*;
 
     // FIXME: #[test]
     fn test_host_export_to_wasm() {
+        let Context { store, module, mut linker } = guest_prepare();
+
         // 初始化 Lowlevel
-        let mut ll_ctx = LowLevelCtx::new();
+        let store_lock = Arc::new(Mutex::new(Cell::new(store)));
+        let mut ll_ctx = LowLevelCtx::new(store_lock.clone());
         ll_ctx.set_message_callback(lowlevel_callback);
+        let ll_ctx = Arc::new(ll_ctx);
+        ll_ctx.clone().add_to_linker(&mut linker).unwrap();
+
         // 初始化内部上下文
         let mut ctx = MockHostContext {
             rpc_ctx: RpcNode::new(SerializeCtx::new(), 0,
