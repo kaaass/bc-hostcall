@@ -26,8 +26,8 @@ fn host_export_to_wasm(param: String) -> String {
 /// 实际生成的函数应该是异步的并且使用异步模块的 Context。
 fn __bc_wrapper_host_export_to_wasm(resp: &RpcResponseCtx, args: &[u8]) -> Result<()> {
     // 函数标识符
-    let mut func = abi::FunctionIdent::new("wasm_export_to_host");
-    func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
+    let mut func = abi::FunctionIdent::new("host_export_to_wasm");
+    func.set_hint(abi::LinkHint::Host);
     // 参数解析
     let args = Args::from_bytes(resp.serialize_ctx(), args)?;
     let arg0_param: String = args.get::<String>(0).unwrap().clone();
