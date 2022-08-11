@@ -47,7 +47,7 @@ static CTX: OnceCell<MockHostContext> = OnceCell::new();
 
 fn lowlevel_callback(data: &[u8]) {
     let ctx = CTX.get().unwrap();
-    ctx.rpc_ctx.handle_message(data);
+    ctx.rpc_ctx.handle_message(data).unwrap();
 }
 
 fn init_imports() -> RpcImports {
@@ -60,8 +60,7 @@ fn init_imports() -> RpcImports {
 }
 
 mod tests {
-    use std::cell::Cell;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc};
     use low_level::host::LowLevelCtx;
     use rpc::adapter::HostSendMessageAdapter;
 
@@ -71,11 +70,10 @@ mod tests {
 
     #[test]
     fn test_wasm_export_to_host() {
-        let Context { store, module, mut linker } = guest_prepare();
+        let Context { mut store, module, mut linker } = guest_prepare();
 
         // 初始化 Lowlevel
-        let store_lock = Arc::new(Mutex::new(Cell::new(store)));
-        let mut ll_ctx = LowLevelCtx::new(store_lock.clone());
+        let mut ll_ctx = LowLevelCtx::new();
         ll_ctx.set_message_callback(lowlevel_callback);
         let ll_ctx = Arc::new(ll_ctx);
         ll_ctx.clone().add_to_linker(&mut linker).unwrap();
@@ -92,20 +90,17 @@ mod tests {
         CTX.set(ctx).unwrap();
 
         // 实例化 WASM
-        let mut store_guard = store_lock.lock().unwrap();
-        let store = store_guard.get_mut();
-        let instance = linker.instantiate(store, &module).unwrap();
-        drop(store_guard);
-        ll_ctx.attach(&instance).unwrap();
+        let instance = linker.instantiate(&mut store, &module).unwrap();
+        ll_ctx.attach(&mut store, &instance).unwrap();
 
         // 运行 main
-        let mut store = store_lock.lock().unwrap();
-        let main_func = instance.get_typed_func::<(), (), _>(store.get_mut(), "__bc_main").unwrap();
-        main_func.call(store.get_mut(), ()).unwrap();
-        drop(store);
+        let main_func = instance.get_typed_func::<(), (), _>(&mut store, "__bc_main").unwrap();
+        main_func.call(&mut store, ()).unwrap();
 
         // 调用
         let ctx = CTX.get().unwrap();
+        ll_ctx.move_store(store);
         wasm_export_to_host(&ctx, "host".to_string());
+        // take out store
     }
 }

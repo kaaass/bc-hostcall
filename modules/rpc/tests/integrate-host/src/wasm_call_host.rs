@@ -2,7 +2,7 @@
 
 use once_cell::sync::OnceCell;
 
-use rpc::{Result, RpcExports, RpcNode, RpcResponseCtx, adapter::HostSendMessageAdapter};
+use rpc::{Result, RpcExports, RpcNode, RpcResponseCtx};
 use rpc::abi;
 use serialize::{Args, SerializeCtx};
 
@@ -49,7 +49,7 @@ fn lowlevel_callback(data: &[u8]) {
     // 实际上是先进入队列，之后才调用 `handle_message`。此时 data 可以被转为 'static，
     // 因为 data 肯定是指向 Wasm 的线性内存的某处的，而由于异步任务的原因，这处的内存在单线
     // 程情况下是不会被修改的。这里为了测试则直接进行调用。
-    ctx.rpc_ctx.handle_message(data);
+    ctx.rpc_ctx.handle_message(data).unwrap();
 }
 
 fn init_exports() -> RpcExports {
@@ -61,8 +61,7 @@ fn init_exports() -> RpcExports {
 }
 
 mod tests {
-    use std::cell::Cell;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc};
     use low_level::host::LowLevelCtx;
     use rpc::adapter::HostSendMessageAdapter;
 
@@ -72,11 +71,10 @@ mod tests {
 
     #[test]
     fn test_host_export_to_wasm() {
-        let Context { store, module, mut linker } = guest_prepare();
+        let Context { mut store, module, mut linker } = guest_prepare();
 
         // 初始化 Lowlevel
-        let store_lock = Arc::new(Mutex::new(Cell::new(store)));
-        let mut ll_ctx = LowLevelCtx::new(store_lock.clone());
+        let mut ll_ctx = LowLevelCtx::new();
         ll_ctx.set_message_callback(lowlevel_callback);
         let ll_ctx = Arc::new(ll_ctx);
         ll_ctx.clone().add_to_linker(&mut linker).unwrap();
@@ -93,19 +91,15 @@ mod tests {
         CTX.set(ctx).unwrap();
 
         // 实例化 WASM
-        let mut store_guard = store_lock.lock().unwrap();
-        let store = store_guard.get_mut();
-        let instance = linker.instantiate(store, &module).unwrap();
-        drop(store_guard);
-        ll_ctx.attach(&instance).unwrap();
+        let instance = linker.instantiate(&mut store, &module).unwrap();
+        ll_ctx.attach(&mut store, &instance).unwrap();
 
         // 运行 main
-        let mut store = store_lock.lock().unwrap();
-        let main_func = instance.get_typed_func::<(), (), _>(store.get_mut(), "__bc_main").unwrap();
-        main_func.call(store.get_mut(), ()).unwrap();
+        let main_func = instance.get_typed_func::<(), (), _>(&mut store, "__bc_main").unwrap();
+        main_func.call(&mut store, ()).unwrap();
 
         // 调用
-        let trigger_call = instance.get_typed_func::<(), (), _>(store.get_mut(), "trigger_call").unwrap();
-        trigger_call.call(store.get_mut(), ()).unwrap();
+        let trigger_call = instance.get_typed_func::<(), (), _>(&mut store, "trigger_call").unwrap();
+        trigger_call.call(&mut store, ()).unwrap();
     }
 }

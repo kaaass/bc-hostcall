@@ -79,7 +79,9 @@ where
         let ctx = RpcResponseCtx::new(seq_no, &self.serialize_ctx, &self.sender);
 
         // 调用回调
-        cb(&ctx, args)
+        cb(&ctx, args).unwrap();
+
+        Ok(())
     }
 
     pub fn handle_message(&self, raw_msg: &[u8]) -> Result<()> {
