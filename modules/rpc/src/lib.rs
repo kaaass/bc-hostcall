@@ -1,7 +1,5 @@
 //! RPC 负责确定 WASM 与 Host 之间的通信方式，并处理部分通信动作
 
-use std::marker;
-
 pub use context::*;
 pub use entry::*;
 pub use node::*;

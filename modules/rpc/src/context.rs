@@ -1,77 +1,39 @@
 //! RPC 调用中的临时上下文管理
-extern crate serde_json;
 use serde::{Serialize, Deserialize};
 
-use serialize::{Args, SerializeCtx};
+use serialize::SerializeCtx;
 
 use crate::{abi, adapter, Result, RpcSeqNo};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum MessageType {
-    Request,
-    Response,
-    Result,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RequestMessage {
-    func: abi::FunctionIdent,
-    args: Vec<u8>,
-}
-
-impl RequestMessage {
-    pub fn new(func: abi::FunctionIdent, args: Vec<u8>) -> Self {
-        RequestMessage { func, args}
-    }
-
-    pub fn func(&self) -> abi::FunctionIdent {
-        self.func.clone()
-    }
-
-    pub fn args(&self) -> Vec<u8> {
-        self.args.clone()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ResponseMessage {
-    result: Vec<u8>,
-}
-
-impl ResponseMessage {
-    pub fn new(result: Vec<u8>) -> Self {
-        ResponseMessage { result }
-    }
-
-    pub fn result(&self) -> Vec<u8> {
-        self.result.clone()
-    }
-
+pub enum Message {
+    Request(Vec<u8>),
+    Response(Vec<u8>),
 }
 
 // 请求消息 便于序列化
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RPCMessage {
+pub struct RpcMessage {
     seq_no: RpcSeqNo,
-    msg_type: MessageType,
-    message: String,
+    func: abi::FunctionIdent,
+    message: Message,
 }
 
-impl RPCMessage {
-    pub fn new(seq_no: RpcSeqNo, msg_type: MessageType, message: String) -> Self {
-        RPCMessage { seq_no, msg_type, message}
+impl RpcMessage {
+    pub fn new(seq_no: RpcSeqNo, func: abi::FunctionIdent, message: Message) -> Self {
+        RpcMessage { seq_no, func, message }
     }
 
     pub fn seq_no(&self) -> RpcSeqNo {
         self.seq_no
     }
 
-    pub fn msg_type(&self) -> MessageType {
-        self.msg_type.clone()
+    pub fn func(&self) -> &abi::FunctionIdent {
+        &self.func
     }
 
-    pub fn message(&self) -> String {
-        self.message.clone()
+    pub fn message(&self) -> &Message {
+        &self.message
     }
 }
 
@@ -79,27 +41,33 @@ impl RPCMessage {
 pub struct RpcRequestCtx<'a> {
     seq_no: RpcSeqNo,
     serialize_ctx: &'a SerializeCtx,
+    sender: &'a dyn adapter::SendMessageAdapter,
 }
 
 impl<'a> RpcRequestCtx<'a> {
-    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx) -> Self {
+    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, sender: &'a dyn adapter::SendMessageAdapter) -> Self {
         RpcRequestCtx {
             seq_no,
             serialize_ctx,
+            sender,
         }
     }
 
-    pub fn make_request(&self, func: abi::FunctionIdent, args: &[u8]) -> Option<String> {
-        // TODO: 发送一个 RPC 调用请求报文。报文别忘了要带 seq_no。 type = 1
-        let requestmsg = RequestMessage::new(func, args.to_vec());
-        let message = RPCMessage::new(
-            self.seq_no, 
-            MessageType::Request, 
-            serde_json::to_string(&requestmsg).unwrap());
+    pub fn send_request(&self, func: abi::FunctionIdent, args: Vec<u8>) -> Result<()> {
+        // 拼接报文
+        let msg = RpcMessage {
+            seq_no: self.seq_no,
+            func,
+            message: Message::Request(args),
+        };
+
         // 序列化
-        let serial = serde_json::to_string(&message).unwrap();
-        // println!("serial = {}", serial);
-        Some(serial)
+        let msg_bytes = self.serialize_ctx.serialize(&msg)?;
+
+        // 发送报文
+        self.sender.send_message(&msg_bytes)?;
+
+        Ok(())
     }
 
     pub fn serialize_ctx(&self) -> &SerializeCtx {
@@ -115,27 +83,33 @@ impl<'a> RpcRequestCtx<'a> {
 pub struct RpcResponseCtx<'a> {
     seq_no: RpcSeqNo,
     serialize_ctx: &'a SerializeCtx,
+    sender: &'a dyn adapter::SendMessageAdapter,
 }
 
 impl<'a> RpcResponseCtx<'a> {
-    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx) -> Self {
+    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, sender: &'a dyn adapter::SendMessageAdapter) -> Self {
         RpcResponseCtx {
             seq_no,
             serialize_ctx,
+            sender,
         }
     }
 
-    pub fn make_response(&self, result: &[u8]) -> Option<String> {
-        // TODO: 发送一个 RPC 调用结果报文 type = 2
-        let responsemsg = ResponseMessage::new(result.to_vec());
-        let message = RPCMessage::new(
-            self.seq_no, 
-            MessageType::Response, 
-            serde_json::to_string(&responsemsg).unwrap());
+    pub fn send_response(&self, func: abi::FunctionIdent, result: Vec<u8>) -> Result<()> {
+        // 拼接报文
+        let msg = RpcMessage {
+            seq_no: self.seq_no,
+            func,
+            message: Message::Response(result),
+        };
+
         // 序列化
-        let serial = serde_json::to_string(&message).unwrap();
-        // println!("serial = {}", serial);
-        Some(serial)
+        let msg_bytes = self.serialize_ctx.serialize(&msg)?;
+
+        // 发送报文
+        self.sender.send_message(&msg_bytes)?;
+
+        Ok(())
     }
 
     pub fn serialize_ctx(&self) -> &SerializeCtx {

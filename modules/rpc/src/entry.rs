@@ -2,8 +2,6 @@
 
 use std::collections::HashMap;
 
-use serialize::Args;
-
 use crate::{abi, Result, RpcResponseCtx, RpcResultCtx};
 
 /// 导出函数的回调。第一个参数为发送返回结果的 RPC 上下文，第二个参数为反序列化前的参数。
