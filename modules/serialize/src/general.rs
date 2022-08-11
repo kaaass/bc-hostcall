@@ -5,22 +5,11 @@ use rkyv::ser::serializers::AllocSerializer;
 use crate::Result;
 
 /// 可序列化类型的标注 trait
-/// TODO: 这个 Trait 是用来隐藏不同的序列化实现的，当然嫌麻烦也可以去掉。
-///       在实际使用中应该通过 Auto Trait 的方式来为对应序列化库支持的
-///       类型提供标注。比如对于用 `Serialize` 和 `Deserialize` Trait
-///       来标注可序列化类型的库，可以做：
-///       ```ignore
-///       impl <T> HostcallValue for T where T : Serialize {}
-///       impl <T> HostcallValue for T where T : Deserialize {}
-///       ```
-///       参考资料：
-///       - https://doc.rust-lang.org/beta/unstable-book/language-features/auto-traits.html
-pub trait HostcallValue {}
+pub trait HostcallValue : Serialize<AllocSerializer<256>> + Archive {}
 
-// FIXME: 此处仅供暂时 Mock，实际上 Sized 是一个过于宽泛的约束了
-impl<T> HostcallValue for T where T: Sized {}
+impl<T> HostcallValue for T where T: Serialize<AllocSerializer<256>> + Archive {}
 
-/// 对序列化所需的内部数据结构进行封装 FIXME: 如果不需要可以不含任何字段
+/// 对序列化所需的内部数据结构进行封装
 pub struct SerializeCtx;
 
 impl SerializeCtx {
