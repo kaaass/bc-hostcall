@@ -1,20 +1,18 @@
 //! 进行基础序列化工作的系列定义
 
-use rkyv::{Serialize, AlignedVec, Archive};
-use rkyv::ser::serializers::AllocSerializer;
+use serde::{Deserialize, Serialize};
 use crate::Result;
 
 /// 可序列化类型的标注 trait
-pub trait HostcallValue : Serialize<AllocSerializer<256>> + Archive {}
+pub trait HostcallValue<'a> : Serialize + Deserialize<'a> {}
 
-impl<T> HostcallValue for T where T: Serialize<AllocSerializer<256>> + Archive {}
+impl<'a, T> HostcallValue<'a> for T where T: Serialize + Deserialize<'a> {}
 
 /// 对序列化所需的内部数据结构进行封装
 pub struct SerializeCtx;
 
 impl SerializeCtx {
     pub fn new() -> Self {
-        // TODO
         SerializeCtx
     }
 
@@ -30,10 +28,10 @@ impl SerializeCtx {
     /// let bytes: &[u8] = serialized.as_ref();
     /// println!("序列化结果：{:?}", bytes);
     /// ```
-    pub fn serialize<T>(&self, value: &T) -> Result<AlignedVec>
-        where T: Serialize<AllocSerializer<256>>,
+    pub fn serialize<T>(&self, value: &T) -> Result<Vec<u8>>
+        where T: Serialize + ?Sized,
     {
-        Ok(rkyv::to_bytes::<_, 256>(value)?)
+        Ok(rmp_serde::to_vec(value)?)
     }
 
     /// 对所给的二进制数据进行反序列化
@@ -50,14 +48,13 @@ impl SerializeCtx {
     /// let serialized = ctx.serialize::<_>(&expected).unwrap();
     /// let bytes: &[u8] = serialized.as_ref();
     ///
-    /// let actual: &str = ctx.deserialize::<String>(bytes).unwrap();
+    /// let actual: String = ctx.deserialize::<String>(bytes).unwrap();
     /// assert_eq!(expected, actual);
     /// ```
-    pub fn deserialize<'a, 'b, T>(&'b self, bytes: &'a [u8]) -> Result<&'a T::Archived>
-        where T: Archive + ?Sized,
+    pub fn deserialize<'a, 'b, T>(&'b self, bytes: &'a [u8]) -> Result<T>
+        where T: Deserialize<'a>,
     {
-        // FIXME: 增加 rkyv::check_archived_root 进行校验
-        Ok(unsafe { rkyv::archived_root::<T>(bytes) })
+        Ok(rmp_serde::from_slice(bytes)?)
     }
 }
 
@@ -81,7 +78,7 @@ mod tests {
         let serialized = ctx.serialize::<_>(&expected).unwrap();
         let bytes: &[u8] = serialized.as_ref();
 
-        let actual: &str = ctx.deserialize::<String>(bytes).unwrap();
+        let actual: String = ctx.deserialize::<String>(bytes).unwrap();
         assert_eq!(expected, actual);
     }
 }

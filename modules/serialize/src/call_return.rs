@@ -1,8 +1,7 @@
 //! 参数及其返回值等等与函数调用相关的序列化和反序列化
 
-use rkyv::{Archive, Deserialize, Serialize};
-
 use crate::{HostcallValue, Result, SerializeCtx};
+use serde::{Deserialize, Serialize};
 
 /// 用于构建可序列化的参数的数据结构，其内部应该维护一系列等待序列化的参数的引用
 ///
@@ -35,21 +34,19 @@ impl<'a> ArgsBuilder<'a> {
         }
     }
 
-    pub fn push<T>(&mut self, value: &T) -> Result<&mut Self>
-        where T: HostcallValue,
+    pub fn push<'b, T>(&mut self, value: &'b T) -> Result<&mut Self>
+        where T: HostcallValue<'b>,
     {
         self.args.arg_buffers.push(self.ctx.serialize(value)?.to_vec());
         Ok(self)
     }
 
     pub fn build(&self) -> Result<Vec<u8>> {
-        let bytes = self.ctx.serialize(&self.args)?;
-        Ok(bytes.to_vec())
+        self.ctx.serialize(&self.args)
     }
 }
 
-#[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]
-#[archive(compare(PartialEq))]
+#[derive(Debug, Serialize, Deserialize)]
 struct InnerArgs {
     arg_buffers: Vec<Vec<u8>>,
 }
@@ -67,27 +64,31 @@ struct InnerArgs {
 /// let bytes = ArgsBuilder::new(&ctx).push(&expected).unwrap()
 ///                                 .build().unwrap();
 ///
-/// let args = Args::from_bytes(&bytes).unwrap();
-/// let actual = args.get::<i32>(&ctx, 0).unwrap();
-/// assert_eq!(&expected, actual);
+/// let args = Args::from_bytes(&ctx, &bytes).unwrap();
+/// let actual = args.get::<i32>(0).unwrap();
+/// assert_eq!(expected, actual);
 ///
-/// args.get::<i32>(&ctx, 1).unwrap_err();
+/// args.get::<i32>(1).unwrap_err();
 /// ```
 pub struct Args<'a> {
-    bytes: &'a [u8],
+    inner_args: InnerArgs,
+    ctx: &'a SerializeCtx,
 }
 
 impl<'a> Args<'a> {
-    pub fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
-        Ok(Args { bytes })
+    pub fn from_bytes(ctx: &'a SerializeCtx, bytes: &[u8]) -> Result<Self> {
+        Ok(Args {
+            inner_args: ctx.deserialize(bytes)?,
+            ctx
+        })
     }
 
-    pub fn get<T>(&self, ctx: &SerializeCtx, index: usize) -> Result<&T::Archived>
-        where T: HostcallValue,
+    pub fn get<'b, T>(&'b self, index: usize) -> Result<T>
+        where T: HostcallValue<'b>,
     {
-        let args = ctx.deserialize::<InnerArgs>(self.bytes)?;
-        let bytes = args.arg_buffers.get(index).ok_or(format!("index {} out of range", index))?;
-        Ok(ctx.deserialize::<T>(bytes)?)
+        let args = &self.inner_args.arg_buffers;
+        let bytes = args.get(index).ok_or(format!("index {} out of range", index))?;
+        Ok(self.ctx.deserialize::<T>(bytes)?)
     }
 }
 
@@ -104,10 +105,10 @@ mod tests {
             .push(&arg1).unwrap()
             .push(&arg2).unwrap()
             .build().unwrap();
-        let args = Args::from_bytes(&bytes).unwrap();
-        let actual = args.get::<String>(&ctx, 0).unwrap();
-        assert_eq!(&arg1, actual);
-        let actual = args.get::<i32>(&ctx, 1).unwrap();
-        assert_eq!(&arg2, actual);
+        let args = Args::from_bytes(&ctx, &bytes).unwrap();
+        let actual = args.get::<String>(0).unwrap();
+        assert_eq!(arg1, actual);
+        let actual = args.get::<i32>(1).unwrap();
+        assert_eq!(arg2, actual);
     }
 }
