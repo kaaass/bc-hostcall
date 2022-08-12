@@ -88,6 +88,7 @@ impl WasmModule {
             let peer_name = rpc_ctx.get_peer_name()
                 .ok_or("Peer Info not presents!")?;
             self.name = Some(peer_name);
+            async_ctx.set_peer_hint(self.get_hint());
         }
 
         self.ll_ctx = Some(ll_ctx);

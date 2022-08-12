@@ -48,6 +48,8 @@ pub struct AsyncCtx {
 
     /// 解析其他模块异步上下文的回调
     resolve_cb: Mutex<Cell<Option<Box<CtxResolveCallback>>>>,
+
+    peer_hint: Mutex<Option<abi::LinkHint>>,
 }
 
 impl AsyncCtx {
@@ -62,6 +64,7 @@ impl AsyncCtx {
             rpc_ctx: Mutex::new(Cell::new(None)),
             tx_action: Mutex::new(Cell::new(HashMap::new())),
             resolve_cb: Mutex::new(Cell::new(None)),
+            peer_hint: Mutex::new(None),
         }
     }
 
@@ -70,6 +73,15 @@ impl AsyncCtx {
     {
         let mut resolve_cb = self.resolve_cb.lock().unwrap();
         *resolve_cb.get_mut() = Some(Box::new(cb));
+    }
+
+    pub fn set_peer_hint(&self, hint: abi::LinkHint) {
+        let mut peer_hint = self.peer_hint.lock().unwrap();
+        *peer_hint = Some(hint);
+    }
+
+    pub fn peer_hint(&self) -> Option<abi::LinkHint> {
+        self.peer_hint.lock().unwrap().clone()
     }
 
     pub fn push_tx(&self, msg: Vec<u8>) {
@@ -121,8 +133,10 @@ impl AsyncCtx {
         dest_ctx.push_rx(raw_msg.to_vec());
 
         // 设置返回动作
+        let me = ctx.data().peer_hint()
+            .ok_or(format!("`peer_hint` not set, cannot forward!"))?;
         dest_ctx.push_action(ctx.seq_no(),
-                             ResultAction::ForwardResult(link_hint.clone(), func.clone()));
+                             ResultAction::ForwardResult(me, func.clone()));
 
         Ok(())
     }
