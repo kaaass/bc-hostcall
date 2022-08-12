@@ -67,6 +67,7 @@ impl Queue {
         }
     }
 
+    #[allow(dead_code)]
     pub fn run_all(&self) {
         (self.closure.as_ref())();
     }

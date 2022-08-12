@@ -8,8 +8,6 @@ use low_level::set_message_callback;
 use rpc::{abi, RpcEndCtx, RpcNode, RpcSeqNo};
 use rpc::adapter::{SendMessageAdapter, WasmSendMessageAdapter};
 
-use crate::queue::QUEUE;
-
 /// WASM 内部的运行时上下文
 pub struct WasmRtCtx {
     pub rpc_ctx: RefCell<Option<RpcNode<WasmSendMessageAdapter>>>,
@@ -74,6 +72,7 @@ pub fn result_message_cb(ctx: &RpcEndCtx<WasmSendMessageAdapter>, res: Vec<u8>) 
 macro_rules! bc_wasm_module {
     ($name:expr, $export_cb:ident) => {
         #[no_mangle]
+        #[cfg(target_arch = "wasm32")]
         pub extern "C" fn __bc_main() {
             use std::hash::Hash;
             use std::hash::Hasher;
@@ -110,7 +109,9 @@ macro_rules! bc_wasm_module {
 }
 
 #[no_mangle]
+#[cfg(target_arch = "wasm32")]
 pub extern "C" fn __bc_low_level_wasm_poll() {
+    use crate::queue::QUEUE;
     QUEUE.with(|queue| {
         queue.run_all();
     });
