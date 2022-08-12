@@ -24,6 +24,7 @@ pub struct RpcNode<T>
     forward_cb: Option<Box<RpcForwardCallback<T>>>,
     result_cb: Option<Box<RpcResultCallback<T>>>,
     data: T,
+    peer_name: Mutex<Cell<Option<String>>>,
 }
 
 impl<T> RpcNode<T>
@@ -41,6 +42,7 @@ impl<T> RpcNode<T>
             forward_cb: None,
             result_cb: None,
             data,
+            peer_name: Mutex::new(Cell::new(None)),
         }
     }
 
@@ -101,6 +103,7 @@ impl<T> RpcNode<T>
         let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
         let seq_no = msg.seq_no();
         let func = msg.func().clone();
+        println!("{:?}", msg);
         let inner = msg.consume();
 
         match inner {
@@ -126,7 +129,27 @@ impl<T> RpcNode<T>
                 let ctx = RpcEndCtx::new(seq_no, &self.serialize_ctx, &self.data);
                 result_cb(&ctx, res)
             }
+            Message::PeerInfo(name) => {
+                // 设置对端名称
+                let peer_name = self.peer_name.lock().unwrap();
+                peer_name.set(Some(name));
+                Ok(())
+            }
         }
+    }
+
+    pub fn get_peer_name(&self) -> Option<String> {
+        let mut peer_name = self.peer_name.lock().unwrap();
+        peer_name.get_mut().clone()
+    }
+
+    pub fn make_peer_info(&self, name: String) -> Vec<u8> {
+        // 拼接报文
+        let func = abi::FunctionIdent::new("");
+        let msg = RpcMessage::new(u64::MAX, func, Message::PeerInfo(name));
+
+        // 序列化
+        self.serialize_ctx.serialize(&msg).unwrap()
     }
 }
 

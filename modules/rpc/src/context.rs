@@ -9,6 +9,7 @@ use crate::{abi, Result, RpcSeqNo};
 pub enum Message {
     Request(Vec<u8>),
     Response(Vec<u8>),
+    PeerInfo(String),
 }
 
 // 请求消息 便于序列化
