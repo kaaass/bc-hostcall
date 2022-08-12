@@ -2,7 +2,8 @@
 
 use once_cell::sync::OnceCell;
 
-use rpc::{abi, Result, RpcImports, RpcNode, RpcEndCtx};
+use rpc::{abi, Result, RpcNode, RpcEndCtx};
+use rpc::adapter::SendMessageAdapter;
 use serialize::{ArgsBuilder, SerializeCtx};
 
 use crate::MockHostContext;
@@ -28,16 +29,17 @@ fn wasm_export_to_host(ctx: &MockHostContext, param: String) {
         .push(&param).unwrap()
         .build().unwrap();
     // 发送消息
-    req.make_request(func, args).unwrap();
+    let msg = req.make_request(func, args).unwrap();
+    req.data().send_message(&msg).unwrap();
     // 完成上述操作后，应该已经调用了 `__bc_wrapper_wasm_export_to_host` 并停止
     // 在异步调用 `wasm_export_to_host` 之前。此时就等待返回报文触发
     // `wasm_export_to_host_return` 回调。如果已经支持异步的话，则此处是在 await
     // 之后。
 }
 
-fn wasm_export_to_host_return(ret: &RpcEndCtx, data: &[u8]) -> Result<()> {
+fn wasm_export_to_host_return<T>(ret: &RpcEndCtx<T>, data: Vec<u8>) -> Result<()> {
     // 解析参数
-    let result = ret.serialize_ctx().deserialize::<String>(data).unwrap();
+    let result = ret.serialize_ctx().deserialize::<String>(&data).unwrap();
     // 返回结果
     println!("收到 Wasm 的返回值：{}", result);
     Ok(())
@@ -50,21 +52,13 @@ fn lowlevel_callback(data: &[u8]) {
     ctx.rpc_ctx.handle_message(data).unwrap();
 }
 
-fn init_imports() -> RpcImports {
-    let mut imports = RpcImports::new();
-    // 添加导入函数的回调
-    let mut func = abi::FunctionIdent::new("wasm_export_to_host");
-    func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
-    imports.add_imports(func, wasm_export_to_host_return);
-    imports
-}
-
 mod tests {
     use std::sync::{Arc};
     use low_level::host::LowLevelCtx;
     use rpc::adapter::HostSendMessageAdapter;
 
     use crate::utils::*;
+    use crate::WasiCtx;
 
     use super::*;
 
@@ -83,9 +77,9 @@ mod tests {
             rpc_ctx: RpcNode::new(SerializeCtx::new(), 0,
                                   HostSendMessageAdapter::new(ll_ctx.clone())),
         };
-        // 注册导入模块
-        let imports = init_imports();
-        ctx.rpc_ctx.set_imports(imports);
+
+        ctx.rpc_ctx.set_result_cb(wasm_export_to_host_return::<HostSendMessageAdapter<WasiCtx>>);
+
         // 设置上下文
         CTX.set(ctx).unwrap();
 

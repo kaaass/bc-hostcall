@@ -60,9 +60,8 @@ pub(crate) mod __bc {
         // 注册导出模块
         let exports = __bc_module_export();
         ctx.rpc_ctx.set_exports(exports);
-        // 注册导入模块
-        let imports = __bc_module_import();
-        ctx.rpc_ctx.set_imports(imports);
+
+        ctx.rpc_ctx.set_result_cb(host_export_to_wasm_return::<WasmSendMessageAdapter>);
         // 设置上下文
         CTX.set(ctx).unwrap();
         // 此时应该启动 Wasm 内的异步运行时运行用户的异步 `main`。不过此处没有实现，

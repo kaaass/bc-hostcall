@@ -24,7 +24,7 @@ fn host_export_to_wasm(param: String) -> String {
 /// ```
 ///
 /// 实际生成的函数应该是异步的并且使用异步模块的 Context。
-fn __bc_wrapper_host_export_to_wasm(resp: &RpcResponseCtx, args: &[u8]) -> Result<()> {
+fn __bc_wrapper_host_export_to_wasm<T>(resp: &RpcResponseCtx<T>, args: &[u8]) -> Result<()> {
     // 函数标识符
     let mut func = abi::FunctionIdent::new("host_export_to_wasm");
     func.set_hint(abi::LinkHint::Host);
@@ -52,7 +52,7 @@ fn lowlevel_callback(data: &[u8]) {
     ctx.rpc_ctx.handle_message(data).unwrap();
 }
 
-fn init_exports() -> RpcExports {
+fn init_exports<T: 'static>() -> RpcExports<T> {
     let mut exports = RpcExports::new(abi::LinkHint::Host);
     // 添加导出函数的回调
     let func = abi::FunctionIdent::new("host_export_to_wasm");

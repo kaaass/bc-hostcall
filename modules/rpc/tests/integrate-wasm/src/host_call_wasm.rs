@@ -19,7 +19,7 @@ fn wasm_export_to_host(param: String) -> String {
 /// ```
 ///
 /// 实际生成的函数应该是异步的并且使用异步模块的 Context。
-fn __bc_wrapper_wasm_export_to_host(resp: &RpcResponseCtx, args: &[u8]) -> Result<()> {
+fn __bc_wrapper_wasm_export_to_host<T>(resp: &RpcResponseCtx<T>, args: &[u8]) -> Result<()> {
     // 函数标识符
     let mut func = abi::FunctionIdent::new("wasm_export_to_host");
     func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
@@ -44,7 +44,7 @@ fn __bc_wrapper_wasm_export_to_host(resp: &RpcResponseCtx, args: &[u8]) -> Resul
 ///     wasm_export_to_host
 /// );
 /// ```
-pub fn __bc_module_export() -> RpcExports {
+pub fn __bc_module_export<T: 'static>() -> RpcExports<T> {
     let mut exports = RpcExports::new(abi::LinkHint::BcModule("integrate-wasm".to_string()));
     // 添加导出函数的回调
     let func = abi::FunctionIdent::new("wasm_export_to_host");
