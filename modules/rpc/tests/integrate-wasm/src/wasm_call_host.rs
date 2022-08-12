@@ -1,6 +1,6 @@
 //! Wasm 调用函数、Host 导出函数的函数调用部分
 
-use rpc::{abi, RpcImports, RpcResultCtx, Result};
+use rpc::{abi, RpcImports, RpcEndCtx, Result};
 use serialize::ArgsBuilder;
 
 use crate::__bc::CTX;
@@ -29,7 +29,7 @@ fn host_export_to_wasm(param: String) {
     // 之后。
 }
 
-fn host_export_to_wasm_return(ret: &RpcResultCtx, data: &[u8]) -> Result<()> {
+fn host_export_to_wasm_return(ret: &RpcEndCtx, data: &[u8]) -> Result<()> {
     // 解析参数
     let result = ret.serialize_ctx().deserialize::<String>(data).unwrap();
     // 返回结果
