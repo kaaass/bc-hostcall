@@ -43,7 +43,10 @@ impl Future for HandleTxFuture {
                 let mut tx_queue = self.ctx.tx_queue.lock().unwrap();
                 let mut rpc_ctx = self.ctx.rpc_ctx.lock().unwrap();
                 for msg in tx_queue.get_mut().iter() {
-                    rpc_ctx.get_mut().as_ref().unwrap().handle_message(msg).unwrap();
+                    let ret = rpc_ctx.get_mut().as_ref().unwrap().handle_message(msg);
+                    if let Err(e) = ret {
+                        eprintln!("[HandleTxFuture]: handle_message error: {:?}, discard!", e);
+                    }
                 }
                 tx_queue.get_mut().clear();
             }
