@@ -1,0 +1,15 @@
+[package]
+name = "module-api"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.20.1", features = ["full"] }
+async-api = { path = "../async-api" }
+rpc = { path = "../rpc" }
+low-level = { path = "../low-level" }
+serialize = { path = "../serialize" }
+wasmtime = "0.39.1"
+wasmtime-wasi = "0.39.1"

@@ -15,4 +15,5 @@ members = [
     "modules/rpc",
     "modules/rpc/tests/integrate-host",
     "modules/async-api",
+    "modules/module-api",
 ]
