@@ -178,7 +178,7 @@ impl Future for AsyncRequestFuture {
 mod tests {
     use std::sync::{Arc};
     use low_level::host::LowLevelCtx;
-    use rpc::{abi, RpcImports, RpcNode};
+    use rpc::{abi, RpcNode};
     use serialize::{ArgsBuilder, SerializeCtx};
 
     use crate::tests::*;
@@ -241,15 +241,6 @@ mod tests {
         assert_eq!(cnt, 2);
     }
 
-    fn init_imports() -> RpcImports {
-        let mut imports = RpcImports::new();
-        // 添加导入函数的回调
-        let mut func = abi::FunctionIdent::new("wasm_export_to_host");
-        func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
-        imports.add_imports(func);
-        imports
-    }
-
     async fn wasm_export_to_host(ctx: Arc<AsyncCtx>, param: String) -> crate::Result<String> {
         let ser_ctx = SerializeCtx::new();
         // 函数标识符
@@ -282,14 +273,11 @@ mod tests {
         ll_ctx.clone().add_to_linker(&mut linker).unwrap();
 
         // 创建 RpcNode
-        let mut rpc_node = RpcNode::new(
+        let rpc_node = RpcNode::new(
             SerializeCtx::new(),
             0,
             ctx.clone()
         );
-
-        // 增加要调用的函数
-        rpc_node.set_imports(init_imports());
 
         // 绑定 RpcNode
         ctx.bind_rpc(rpc_node);

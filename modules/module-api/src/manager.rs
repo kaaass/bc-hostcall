@@ -32,4 +32,10 @@ impl ModuleManager {
 
         modules.get_mut().remove(link_hint)
     }
+
+    pub fn list_modules(&self) -> Vec<abi::LinkHint> {
+        let mut modules = self.modules.lock().unwrap();
+
+        modules.get_mut().keys().cloned().collect()
+    }
 }

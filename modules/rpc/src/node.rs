@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::sync::Mutex;
 
-use crate::{abi, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcEndCtx};
+use crate::{abi, Message, Result, RpcExports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcEndCtx};
 use serialize::SerializeCtx;
 
 pub type RpcSeqNo = u64;
@@ -18,7 +18,6 @@ pub struct RpcNode<T>
     where T: Send + Sync + 'static,
 {
     serialize_ctx: SerializeCtx,
-    imports: Option<RpcImports>,
     exports: Option<RpcExports<T>>,
     nonce: u32,
     request_num: Mutex<Cell<u32>>,
@@ -36,7 +35,6 @@ impl<T> RpcNode<T>
     pub fn new(serialize_ctx: SerializeCtx, nonce: u32, data: T) -> Self {
         RpcNode {
             serialize_ctx,
-            imports: None,
             exports: None,
             nonce,
             request_num: Mutex::new(Cell::new(0)),
@@ -44,10 +42,6 @@ impl<T> RpcNode<T>
             result_cb: None,
             data,
         }
-    }
-
-    pub fn set_imports(&mut self, imports: RpcImports) {
-        self.imports = Some(imports);
     }
 
     pub fn set_exports(&mut self, exports: RpcExports<T>) {
