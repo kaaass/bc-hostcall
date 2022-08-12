@@ -60,6 +60,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-rt"
+version = "0.1.0"
+dependencies = [
+ "low-level",
+ "rpc",
+ "serialize",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -113,6 +122,7 @@ name = "bc-hostcall"
 version = "0.1.0"
 dependencies = [
  "async-api",
+ "async-rt",
  "low-level",
  "module-api",
  "rpc",
