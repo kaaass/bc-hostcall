@@ -127,16 +127,16 @@ impl<'a, T> RpcResponseCtx<'a, T> {
     }
 }
 
-/// RPC 函数调用结果返回值的临时上下文，用于在相关函数回调中提供解析、处理调用结果所需的 API
-pub struct RpcResultCtx<'a, T> {
+/// RPC 函数调用结果返回值、转发的临时上下文，用于在相关函数回调中提供解析、处理调用结果所需的 API
+pub struct RpcEndCtx<'a, T> {
     seq_no: RpcSeqNo,
     serialize_ctx: &'a SerializeCtx,
     data: &'a T,
 }
 
-impl<'a, T> RpcResultCtx<'a, T> {
+impl<'a, T> RpcEndCtx<'a, T> {
     pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, data: &'a T) -> Self {
-        RpcResultCtx {
+        RpcEndCtx {
             seq_no,
             serialize_ctx,
             data,

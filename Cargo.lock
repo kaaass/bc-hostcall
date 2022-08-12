@@ -113,6 +113,13 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 [[package]]
 name = "bc-hostcall"
 version = "0.1.0"
+dependencies = [
+ "async-api",
+ "low-level",
+ "module-api",
+ "rpc",
+ "serialize",
+]
 
 [[package]]
 name = "bincode"
@@ -805,6 +812,19 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys",
+]
+
+[[package]]
+name = "module-api"
+version = "0.1.0"
+dependencies = [
+ "async-api",
+ "low-level",
+ "rpc",
+ "serialize",
+ "tokio",
+ "wasmtime",
+ "wasmtime-wasi",
 ]
 
 [[package]]

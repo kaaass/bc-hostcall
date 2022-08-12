@@ -1,5 +1,5 @@
 [package]
-name = "async-api"
+name = "module-api"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,11 +7,9 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.20.1", features = ["full"] }
+async-api = { path = "../async-api" }
 rpc = { path = "../rpc" }
 low-level = { path = "../low-level" }
 serialize = { path = "../serialize" }
-
-[dev-dependencies]
 wasmtime = "0.39.1"
 wasmtime-wasi = "0.39.1"
-serialize = { path = "../serialize" }

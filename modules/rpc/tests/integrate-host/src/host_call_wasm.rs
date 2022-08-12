@@ -2,7 +2,7 @@
 
 use once_cell::sync::OnceCell;
 
-use rpc::{abi, Result, RpcImports, RpcNode, RpcResultCtx};
+use rpc::{abi, Result, RpcImports, RpcNode, RpcEndCtx};
 use serialize::{ArgsBuilder, SerializeCtx};
 
 use crate::MockHostContext;
@@ -35,7 +35,7 @@ fn wasm_export_to_host(ctx: &MockHostContext, param: String) {
     // 之后。
 }
 
-fn wasm_export_to_host_return(ret: &RpcResultCtx, data: &[u8]) -> Result<()> {
+fn wasm_export_to_host_return(ret: &RpcEndCtx, data: &[u8]) -> Result<()> {
     // 解析参数
     let result = ret.serialize_ctx().deserialize::<String>(data).unwrap();
     // 返回结果

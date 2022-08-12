@@ -3,16 +3,16 @@
 use std::cell::Cell;
 use std::sync::Mutex;
 
-use crate::{abi, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcResultCtx};
+use crate::{abi, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcEndCtx};
 use serialize::SerializeCtx;
 
 pub type RpcSeqNo = u64;
 
-pub type RpcForwardCallback =
-    dyn Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
+pub type RpcForwardCallback<T> =
+    dyn Fn(&RpcEndCtx<T>, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
 
 pub type RpcResultCallback<T> =
-    dyn Fn(&RpcResultCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static;
+    dyn Fn(&RpcEndCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static;
 
 pub struct RpcNode<T>
     where T: Send + Sync + 'static,
@@ -22,7 +22,7 @@ pub struct RpcNode<T>
     exports: Option<RpcExports<T>>,
     nonce: u32,
     request_num: Mutex<Cell<u32>>,
-    forward_cb: Option<Box<RpcForwardCallback>>,
+    forward_cb: Option<Box<RpcForwardCallback<T>>>,
     result_cb: Option<Box<RpcResultCallback<T>>>,
     data: T,
 }
@@ -56,14 +56,14 @@ impl<T> RpcNode<T>
 
     pub fn set_forward_cb<CB>(&mut self, forward_cb: CB)
     where
-        CB: Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static,
+        CB: Fn(&RpcEndCtx<T>, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static,
     {
         self.forward_cb = Some(Box::new(forward_cb));
     }
 
     pub fn set_result_cb<CB>(&mut self, result_cb: CB)
     where
-        CB: Fn(&RpcResultCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static,
+        CB: Fn(&RpcEndCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static,
     {
         self.result_cb = Some(Box::new(result_cb));
     }
@@ -120,7 +120,8 @@ impl<T> RpcNode<T>
                         // 如果没有对应的回调，则调用 `forward_cb` 把这个报文转发给其他模块
                         let forward_cb =
                             self.forward_cb.as_ref().ok_or(format!("no forward_cb"))?;
-                        forward_cb(seq_no, func.clone(), raw_msg)
+                        let ctx = RpcEndCtx::new(seq_no, &self.serialize_ctx, &self.data);
+                        forward_cb(&ctx, func.clone(), raw_msg)
                     }
                 }
             }
@@ -128,7 +129,7 @@ impl<T> RpcNode<T>
                 // 返回结果
                 let result_cb =
                     self.result_cb.as_ref().ok_or(format!("no result_cb"))?;
-                let ctx = RpcResultCtx::new(seq_no, &self.serialize_ctx, &self.data);
+                let ctx = RpcEndCtx::new(seq_no, &self.serialize_ctx, &self.data);
                 result_cb(&ctx, res)
             }
         }
@@ -150,7 +151,7 @@ mod tests {
 
     struct MockAdapter;
 
-    impl adapter::SendMessageAdapter for MockAdapter {
+    impl SendMessageAdapter for MockAdapter {
         fn send_message(&self, msg: &[u8]) -> Result<()> {
             // 保存发送的消息
             unsafe {

@@ -14,3 +14,4 @@ cd $base_dir || exit
 
 # async-api 模块
 ./modules/async-api/tests/unittest-future/build.sh
+./modules/async-api/tests/integrate-wasm/build.sh
