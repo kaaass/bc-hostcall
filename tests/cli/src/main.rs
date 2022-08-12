@@ -75,7 +75,8 @@ async fn command_call_app(ctx: &mut CliContext, name: &str, param: String) -> Re
     };
 
     // 调用 `app` 函数
-    app(module.as_ref(), param).await?;
+    let result = app(module.as_ref(), param).await?;
+    println!("[Host] 调用结果：{}", result);
 
     Ok(())
 }
