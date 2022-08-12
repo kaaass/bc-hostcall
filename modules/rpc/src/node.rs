@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::sync::Mutex;
 
-use crate::{abi, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcEndCtx};
+use crate::{abi, Message, Result, RpcExports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcEndCtx};
 use serialize::SerializeCtx;
 
 pub type RpcSeqNo = u64;
@@ -18,13 +18,13 @@ pub struct RpcNode<T>
     where T: Send + Sync + 'static,
 {
     serialize_ctx: SerializeCtx,
-    imports: Option<RpcImports>,
     exports: Option<RpcExports<T>>,
     nonce: u32,
     request_num: Mutex<Cell<u32>>,
     forward_cb: Option<Box<RpcForwardCallback<T>>>,
     result_cb: Option<Box<RpcResultCallback<T>>>,
     data: T,
+    peer_name: Mutex<Cell<Option<String>>>,
 }
 
 impl<T> RpcNode<T>
@@ -36,18 +36,14 @@ impl<T> RpcNode<T>
     pub fn new(serialize_ctx: SerializeCtx, nonce: u32, data: T) -> Self {
         RpcNode {
             serialize_ctx,
-            imports: None,
             exports: None,
             nonce,
             request_num: Mutex::new(Cell::new(0)),
             forward_cb: None,
             result_cb: None,
             data,
+            peer_name: Mutex::new(Cell::new(None)),
         }
-    }
-
-    pub fn set_imports(&mut self, imports: RpcImports) {
-        self.imports = Some(imports);
     }
 
     pub fn set_exports(&mut self, exports: RpcExports<T>) {
@@ -107,6 +103,7 @@ impl<T> RpcNode<T>
         let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
         let seq_no = msg.seq_no();
         let func = msg.func().clone();
+        println!("{:?}", msg);
         let inner = msg.consume();
 
         match inner {
@@ -132,7 +129,27 @@ impl<T> RpcNode<T>
                 let ctx = RpcEndCtx::new(seq_no, &self.serialize_ctx, &self.data);
                 result_cb(&ctx, res)
             }
+            Message::PeerInfo(name) => {
+                // 设置对端名称
+                let peer_name = self.peer_name.lock().unwrap();
+                peer_name.set(Some(name));
+                Ok(())
+            }
         }
+    }
+
+    pub fn get_peer_name(&self) -> Option<String> {
+        let mut peer_name = self.peer_name.lock().unwrap();
+        peer_name.get_mut().clone()
+    }
+
+    pub fn make_peer_info(&self, name: String) -> Vec<u8> {
+        // 拼接报文
+        let func = abi::FunctionIdent::new("");
+        let msg = RpcMessage::new(u64::MAX, func, Message::PeerInfo(name));
+
+        // 序列化
+        self.serialize_ctx.serialize(&msg).unwrap()
     }
 }
 

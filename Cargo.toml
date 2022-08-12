@@ -10,6 +10,8 @@ description = "An asynchronized wasm hostcall framework bridging between rust mo
 low-level = { path = "modules/low-level" }
 serialize = { path = "modules/serialize" }
 rpc = { path = "modules/rpc" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-api = { path = "modules/async-api" }
 module-api = { path = "modules/module-api" }
 
@@ -21,4 +23,5 @@ members = [
     "modules/rpc/tests/integrate-host",
     "modules/async-api",
     "modules/module-api",
+    "tests/cli",
 ]

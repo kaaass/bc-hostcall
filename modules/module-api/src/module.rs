@@ -3,7 +3,7 @@ use wasmtime::{Engine, Linker, Store};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
 use async_api::ctx::AsyncCtx;
 use low_level::host::LowLevelCtx;
-use rpc::{abi, RpcExports, RpcImports, RpcNode};
+use rpc::{abi, RpcExports, RpcNode};
 use serialize::SerializeCtx;
 use crate::manager::ModuleManager;
 
@@ -30,9 +30,8 @@ impl WasmModule {
     // FIXME: 其实是一个很差劲的封装，大部分操作都是硬编码的，几乎没有可拓展性。但也没有时间去做到
     //        更好了，done is better than nothing.
     pub fn init(&mut self,
-            filename: &str,
-            host_imports: RpcImports,
-            host_exports: RpcExports<Arc<AsyncCtx>>,
+                filename: &str,
+                host_exports: RpcExports<Arc<AsyncCtx>>,
     ) -> Result<()> {
         let engine = Engine::default();
         let mut linker = Linker::new(&engine);
@@ -56,15 +55,6 @@ impl WasmModule {
         let ll_ctx = Arc::new(ll_ctx);
         ll_ctx.clone().add_to_linker(&mut linker)?;
 
-
-        // 获取模块名称
-        let name = if let abi::LinkHint::BcModule(ref name) = host_exports.hint() {
-            name
-        } else {
-            return Err(format!("Invalid LinkHint: {:?}", host_exports.hint()).into());
-        };
-        self.name = Some(name.to_string());
-
         // 创建 RpcNode
         let mut rpc_node = RpcNode::new(
             SerializeCtx::new(),
@@ -73,7 +63,6 @@ impl WasmModule {
         );
 
         // 增加 Host 端的导入导出需求
-        rpc_node.set_imports(host_imports);
         rpc_node.set_exports(host_exports);
 
         // 绑定 RpcNode
@@ -90,6 +79,15 @@ impl WasmModule {
         // XX 这里可以修改为异步，但是实际上这个函数只是做内部数据结构的初始化，不会有什么
         //    很长的 Block 或者甚至 Polling。所以实际上没有必要异步。
         ll_ctx.wasm_main()?;
+
+        // 获得模块名称（对端模块）
+        {
+            let mut rpc_ctx = async_ctx.rpc_ctx.lock().unwrap();
+            let rpc_ctx = rpc_ctx.get_mut().as_ref().unwrap();
+            let peer_name = rpc_ctx.get_peer_name()
+                .ok_or("Peer Info not presents!")?;
+            self.name = Some(peer_name);
+        }
 
         self.ll_ctx = Some(ll_ctx);
 
@@ -158,20 +156,11 @@ mod tests {
         RpcExports::new(abi::LinkHint::BcModule("integrate-wasm".to_string()))
     }
 
-    fn init_imports() -> RpcImports {
-        let mut imports = RpcImports::new();
-        // 添加导入函数的回调
-        let mut func = abi::FunctionIdent::new("wasm_export_to_host");
-        func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
-        imports.add_imports(func);
-        imports
-    }
-
     async fn wasm_export_to_host(ctx: &WasmModule, param: String) -> Result<String> {
         let ser_ctx = SerializeCtx::new();
         // 函数标识符
         let mut func = abi::FunctionIdent::new("wasm_export_to_host");
-        func.set_hint(abi::LinkHint::BcModule("integrate-wasm".to_string()));
+        func.set_hint(ctx.get_hint());
         // 参数拼接
         let args = ArgsBuilder::new(&ser_ctx)
             .push(&param).unwrap()
@@ -189,11 +178,11 @@ mod tests {
 
         // 加载两遍同一个模块
         let mut mod_a = WasmModule::new();
-        mod_a.init(wasm, init_imports(), init_exports()).unwrap();
+        mod_a.init(wasm, init_exports()).unwrap();
         println!("mod_a 名称：{}", mod_a.get_name());
 
         let mut mod_b = WasmModule::new();
-        mod_b.init(wasm, init_imports(), init_exports()).unwrap();
+        mod_b.init(wasm, init_exports()).unwrap();
         println!("mod_b 名称：{}", mod_b.get_name());
 
         // 启动

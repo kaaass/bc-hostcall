@@ -177,7 +177,14 @@ impl AsyncCtx {
     {
         // 添加消息回调
         ll_ctx.set_message_callback(move |msg| {
-            self.push_tx(msg.to_vec());
+            let that = self.as_ref();
+            if that.prepared() {
+                that.push_tx(msg.to_vec());
+            } else {
+                // 异步未就绪，同步处理
+                let mut rpc_ctx = that.rpc_ctx.lock().unwrap();
+                rpc_ctx.get_mut().as_ref().unwrap().handle_message(msg);
+            }
         });
     }
 
@@ -193,24 +200,10 @@ impl AsyncCtx {
         // 等待初始化消息
         loop {
             self.init_notify.notified().await;
-            // 检查 tx_waker
-            {
-                let mut waker = self.tx_waker.lock().unwrap();
-                if waker.get_mut().is_none() {
-                    // 还没成功
-                    continue;
-                }
+            if self.prepared() {
+                // 成功初始化
+                break;
             }
-            // 检查 rx_waker
-            {
-                let mut waker = self.rx_waker.lock().unwrap();
-                if waker.get_mut().is_none() {
-                    // 还没成功
-                    continue;
-                }
-            }
-            // 成功初始化
-            break;
         }
     }
 
@@ -241,5 +234,25 @@ impl AsyncCtx {
             let mut waker = self.rx_waker.lock().unwrap();
             waker.get_mut().as_ref().unwrap().wake_by_ref();
         }
+    }
+
+    pub fn prepared(&self) -> bool {
+        // 检查 tx_waker
+        {
+            let mut waker = self.tx_waker.lock().unwrap();
+            if waker.get_mut().is_none() {
+                // 还没成功
+                return false;
+            }
+        }
+        // 检查 rx_waker
+        {
+            let mut waker = self.rx_waker.lock().unwrap();
+            if waker.get_mut().is_none() {
+                // 还没成功
+                return false;
+            }
+        }
+        true
     }
 }
