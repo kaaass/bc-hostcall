@@ -55,15 +55,6 @@ impl WasmModule {
         let ll_ctx = Arc::new(ll_ctx);
         ll_ctx.clone().add_to_linker(&mut linker)?;
 
-
-        // 获取模块名称
-        let name = if let abi::LinkHint::BcModule(ref name) = host_exports.hint() {
-            name
-        } else {
-            return Err(format!("Invalid LinkHint: {:?}", host_exports.hint()).into());
-        };
-        self.name = Some(name.to_string());
-
         // 创建 RpcNode
         let mut rpc_node = RpcNode::new(
             SerializeCtx::new(),
@@ -88,6 +79,15 @@ impl WasmModule {
         // XX 这里可以修改为异步，但是实际上这个函数只是做内部数据结构的初始化，不会有什么
         //    很长的 Block 或者甚至 Polling。所以实际上没有必要异步。
         ll_ctx.wasm_main()?;
+
+        // 获得模块名称（对端模块）
+        {
+            let mut rpc_ctx = async_ctx.rpc_ctx.lock().unwrap();
+            let rpc_ctx = rpc_ctx.get_mut().as_ref().unwrap();
+            let peer_name = rpc_ctx.get_peer_name()
+                .ok_or("Peer Info not presents!")?;
+            self.name = Some(peer_name);
+        }
 
         self.ll_ctx = Some(ll_ctx);
 
