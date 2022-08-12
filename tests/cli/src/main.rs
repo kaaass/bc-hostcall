@@ -25,7 +25,7 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 struct CliContext {
-    modules: ModuleManager,
+    modules: Arc<ModuleManager>,
 }
 
 /// 加载/重载 Bc Module
@@ -41,8 +41,10 @@ async fn command_load(ctx: &mut CliContext, path: &str) -> Result<()> {
     println!("[Host] 成功启动模块：{}", module.get_name());
 
     // 添加到模块管理器
+    let module = Arc::new(module);
     let swap_out =
-        ctx.modules.register(module.get_hint(), Arc::new(module));
+        ctx.modules.register(module.get_hint(), module.clone());
+    module.attach_to_manager(ctx.modules.clone());
 
     // 如果发现老模块，则卸载
     if let Some(old_module) = swap_out {
@@ -146,7 +148,7 @@ async fn main() {
     usage();
 
     let mut ctx = CliContext {
-        modules: ModuleManager::new(),
+        modules: Arc::new(ModuleManager::new()),
     };
 
     loop {

@@ -183,7 +183,7 @@ impl AsyncCtx {
             } else {
                 // 异步未就绪，同步处理
                 let mut rpc_ctx = that.rpc_ctx.lock().unwrap();
-                rpc_ctx.get_mut().as_ref().unwrap().handle_message(msg);
+                rpc_ctx.get_mut().as_ref().unwrap().handle_message(msg).unwrap();
             }
         });
     }

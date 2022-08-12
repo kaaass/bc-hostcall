@@ -46,6 +46,7 @@ fn __bc_wrapper_http_get(resp: &RpcResponseCtx<Arc<AsyncCtx>>, args: &[u8]) -> R
     let arg0_param: String = args.get::<String>(0).unwrap().clone();
     // 开启异步任务
     let ctx = resp.data().clone();
+    let seq_no = resp.seq_no();
     tokio::spawn(async move {
         // 异步调用函数
         let result: String = http_get(arg0_param).await;
@@ -53,7 +54,8 @@ fn __bc_wrapper_http_get(resp: &RpcResponseCtx<Arc<AsyncCtx>>, args: &[u8]) -> R
         let ser_ctx = SerializeCtx::new();
         let serialized_result = ser_ctx.serialize(&result).unwrap();
         // 结果回送
-        let msg = resp.make_response(func, serialized_result).unwrap();
+        let msg = RpcResponseCtx::new(seq_no, &ser_ctx, &())
+            .make_response(func, serialized_result).unwrap();
         ctx.push_rx(msg);
     });
     Ok(())

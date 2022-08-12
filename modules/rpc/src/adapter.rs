@@ -2,7 +2,6 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use host::*;
-#[cfg(target_arch = "wasm32")]
 pub use wasm::*;
 
 use crate::Result;
@@ -12,7 +11,6 @@ pub trait SendMessageAdapter {
     fn send_message(&self, message: &[u8]) -> Result<()>;
 }
 
-#[cfg(target_arch = "wasm32")]
 mod wasm {
     use low_level::wasm::send_message_to_host;
 

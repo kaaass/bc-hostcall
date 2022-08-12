@@ -11,3 +11,8 @@ pub use async_api;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use module_api;
+
+pub use async_rt;
+
+#[cfg(target_arch = "wasm32")]
+pub use async_rt::bc_wasm_module;

@@ -77,12 +77,16 @@ impl<T> RpcNode<T>
         RpcRequestCtx::new(seq_no, &SerializeCtx, &self.data)
     }
 
+    pub fn reponse(&self, seq_no: RpcSeqNo) -> RpcResponseCtx<T> {
+        RpcResponseCtx::new(seq_no, &SerializeCtx, &self.data)
+    }
+
     fn handle_request(&self, seq_no: RpcSeqNo, func: &abi::FunctionIdent, args: &[u8]) -> Result<()> {
         let exports = self.exports.as_ref().ok_or(format!("no exports"))?;
         let cb = exports.get_callback(func).ok_or(format!("no callback for {:?}", func))?;
 
         // 创建返回上下文
-        let ctx = RpcResponseCtx::new(seq_no, &self.serialize_ctx, &self.data);
+        let ctx = self.reponse(seq_no);
 
         // 调用回调
         cb(&ctx, args).unwrap();
@@ -103,7 +107,6 @@ impl<T> RpcNode<T>
         let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
         let seq_no = msg.seq_no();
         let func = msg.func().clone();
-        println!("{:?}", msg);
         let inner = msg.consume();
 
         match inner {

@@ -1,14 +1,22 @@
 //! Wasm 导出函数、Host 调用函数的函数导出部分
 
+use bc_hostcall::async_rt::spawn_local;
 use bc_hostcall::rpc::{Result, RpcExports, RpcResponseCtx};
 use bc_hostcall::rpc::abi;
-use bc_hostcall::serialize::Args;
+use bc_hostcall::serialize::{Args, SerializeCtx};
 use bc_hostcall::rpc::adapter::{WasmSendMessageAdapter, SendMessageAdapter};
 
 use crate::MODULE_NAME;
+use crate::imports::http_get;
 
 /// Wasm 内导出的函数
-fn app(param: String) -> String {
+async fn app(param: String) -> String {
+
+    // 请求 HTTP
+    let url = "http://www.baidu.com";
+    let result = http_get(url.to_string()).await;
+    println!("{:?}", result);
+
     format!("Hello {}, I'm a wasm module!", param)
 }
 
@@ -16,7 +24,7 @@ fn app(param: String) -> String {
 ///
 /// ```ignore
 /// #[bc_export]
-/// fn app(param: String) -> String {
+/// async fn app(param: String) -> String {
 ///     // ...
 /// }
 /// ```
@@ -29,13 +37,19 @@ fn __bc_wrapper_app(resp: &RpcResponseCtx<WasmSendMessageAdapter>, args: &[u8]) 
     // 参数解析
     let args = Args::from_bytes(resp.serialize_ctx(), args)?;
     let arg0_param: String = args.get::<String>(0).unwrap().clone();
-    // 调用函数。实际应该是异步调用的。
-    let result: String = app(arg0_param);
-    // 序列化结果
-    let serialized_result = resp.serialize_ctx().serialize(&result)?;
-    // 结果回送
-    let msg = resp.make_response(func, serialized_result)?;
-    resp.data().send_message(&msg)?;
+    // 开启异步任务
+    let seq_no = resp.seq_no();
+    spawn_local(async move {
+        // 异步调用函数。
+        let result: String = app(arg0_param).await;
+        // 序列化结果
+        let ser_ctx = SerializeCtx::new();
+        let serialized_result = ser_ctx.serialize(&result).unwrap();
+        // 结果回送
+        let msg = RpcResponseCtx::new(seq_no, &ser_ctx, &())
+            .make_response(func, serialized_result).unwrap();
+        WasmSendMessageAdapter::new().send_message(&msg).unwrap();
+    });
     Ok(())
 }
 

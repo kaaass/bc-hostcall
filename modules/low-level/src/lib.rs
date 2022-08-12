@@ -3,7 +3,6 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub mod host;
 
-#[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
 // FIXME: 此处的错误类型仅仅是最简单，可用于容纳任何错误的类型。而实际上好的错误类型

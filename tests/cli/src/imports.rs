@@ -1,5 +1,5 @@
 use bc_hostcall::module_api::module::WasmModule;
-use bc_hostcall::rpc::{abi, RpcImports};
+use bc_hostcall::rpc::abi;
 use bc_hostcall::serialize::{ArgsBuilder, SerializeCtx};
 
 use crate::Result;
@@ -8,7 +8,7 @@ use crate::Result;
 ///
 /// ```ignore
 /// #[bc_import(host, module = "dispatch")]
-/// fn app(param: String) -> anyhow::Result<String>;
+/// fn app(param: String) -> Result<String>;
 /// ```
 pub async fn app(ctx: &WasmModule, param: String) -> Result<String> {
     let ser_ctx = SerializeCtx::new();
