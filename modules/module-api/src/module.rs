@@ -5,19 +5,22 @@ use async_api::ctx::AsyncCtx;
 use low_level::host::LowLevelCtx;
 use rpc::{abi, RpcExports, RpcImports, RpcNode};
 use serialize::SerializeCtx;
+use crate::manager::ModuleManager;
 
 use crate::Result;
 
 /// WASM 模块在本运行时中的封装
-pub struct Module {
+pub struct WasmModule {
+    name: Option<String>,
     async_ctx: Arc<AsyncCtx>,
     ll_ctx: Option<Arc<LowLevelCtx<WasiCtx>>>,
 }
 
-impl Module {
+impl WasmModule {
 
     pub fn new() -> Self {
-        Module {
+        WasmModule {
+            name: None,
             async_ctx: Arc::new(AsyncCtx::new()),
             ll_ctx: None,
         }
@@ -52,6 +55,15 @@ impl Module {
         async_ctx.clone().bind_low_level(&mut ll_ctx);
         let ll_ctx = Arc::new(ll_ctx);
         ll_ctx.clone().add_to_linker(&mut linker)?;
+
+
+        // 获取模块名称
+        let name = if let abi::LinkHint::BcModule(ref name) = host_exports.hint() {
+            name
+        } else {
+            return Err(format!("Invalid LinkHint: {:?}", host_exports.hint()).into());
+        };
+        self.name = Some(name.to_string());
 
         // 创建 RpcNode
         let mut rpc_node = RpcNode::new(
@@ -102,6 +114,33 @@ impl Module {
         self.async_ctx.kill();
     }
 
+    pub fn attach_to_manager(self: Arc<Self>, manager: Arc<ModuleManager>) {
+        // 注册到管理器
+        manager.clone().register(self.get_hint(), self.clone());
+
+        // 注册模块解析回调
+        let my_hint = self.get_hint();
+        self.async_ctx.set_resolve_cb(move |hint| {
+            let result = manager.resolve(&hint)
+                .ok_or(format!("Failed to resolve module with hint: {:?}", hint))?;
+
+            // 检查是否是本身，避免循环调用
+            if result.get_hint() == my_hint {
+                return Err(format!("Circular import: {:?}", hint).into());
+            }
+
+            Ok(result.async_ctx.clone())
+        });
+    }
+
+    pub fn get_name(&self) -> &str {
+        self.name.as_ref().unwrap()
+    }
+
+    pub fn get_hint(&self) -> abi::LinkHint {
+        abi::LinkHint::BcModule(self.get_name().to_string())
+    }
+
     /// 仅供生成的函数使用，无需直接调用
     #[doc(hidden)]
     pub fn async_ctx(&self) -> Arc<AsyncCtx> {
@@ -116,7 +155,7 @@ mod tests {
     use serialize::ArgsBuilder;
 
     fn init_exports() -> RpcExports<Arc<AsyncCtx>> {
-        RpcExports::new(abi::LinkHint::Host)
+        RpcExports::new(abi::LinkHint::BcModule("integrate-wasm".to_string()))
     }
 
     fn init_imports() -> RpcImports {
@@ -128,7 +167,7 @@ mod tests {
         imports
     }
 
-    async fn wasm_export_to_host(ctx: &Module, param: String) -> Result<String> {
+    async fn wasm_export_to_host(ctx: &WasmModule, param: String) -> Result<String> {
         let ser_ctx = SerializeCtx::new();
         // 函数标识符
         let mut func = abi::FunctionIdent::new("wasm_export_to_host");
@@ -149,12 +188,13 @@ mod tests {
         let wasm = "../async-api/tests/integrate-wasm/integrate-wasm.wasm";
 
         // 加载两遍同一个模块
-        let mut mod_a = Module::new();
-
+        let mut mod_a = WasmModule::new();
         mod_a.init(wasm, init_imports(), init_exports()).unwrap();
+        println!("mod_a 名称：{}", mod_a.get_name());
 
-        let mut mod_b = Module::new();
+        let mut mod_b = WasmModule::new();
         mod_b.init(wasm, init_imports(), init_exports()).unwrap();
+        println!("mod_b 名称：{}", mod_b.get_name());
 
         // 启动
         mod_a.start().await;
