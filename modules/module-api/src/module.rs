@@ -113,9 +113,6 @@ impl WasmModule {
     }
 
     pub fn attach_to_manager(self: Arc<Self>, manager: Arc<ModuleManager>) {
-        // 注册到管理器
-        manager.clone().register(self.get_hint(), self.clone());
-
         // 注册模块解析回调
         let my_hint = self.get_hint();
         self.async_ctx.set_resolve_cb(move |hint| {
