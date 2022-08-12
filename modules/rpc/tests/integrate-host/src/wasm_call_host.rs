@@ -36,7 +36,7 @@ fn __bc_wrapper_host_export_to_wasm(resp: &RpcResponseCtx, args: &[u8]) -> Resul
     // 序列化结果
     let serialized_result = resp.serialize_ctx().serialize(&result)?;
     // 结果回送
-    resp.send_response(func, serialized_result)?;
+    resp.make_response(func, serialized_result)?;
     // 完成调用后，此返回信息应该已被送入 Host 处的消息队列 rx_queue。但在本示例中应该会
     // 直接被分发至 `wasm_export_to_host_return` 函数。
     Ok(())

@@ -59,7 +59,7 @@ impl RpcImports {
     }
 
     /// 添加一个导入函数到导入表
-    pub fn add_imports<CB>(&mut self, func: abi::FunctionIdent) {
+    pub fn add_imports(&mut self, func: abi::FunctionIdent) {
         self.imports_set.insert(func);
     }
 

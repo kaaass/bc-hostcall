@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::sync::Mutex;
 
-use crate::{abi, adapter, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcResultCtx};
+use crate::{abi, Message, Result, RpcExports, RpcImports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcResultCtx};
 use serialize::SerializeCtx;
 
 pub type RpcSeqNo = u64;
@@ -11,8 +11,8 @@ pub type RpcSeqNo = u64;
 pub type RpcForwardCallback =
     dyn Fn(RpcSeqNo, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
 
-pub type RpcResultCallback =
-    dyn Fn(&RpcResultCtx, &[u8]) -> Result<()> + Sync + Send + 'static;
+pub type RpcResultCallback<T> =
+    dyn Fn(&RpcResultCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static;
 
 pub struct RpcNode<T>
     where T: Send + Sync + 'static,
@@ -23,7 +23,7 @@ pub struct RpcNode<T>
     nonce: u32,
     request_num: Mutex<Cell<u32>>,
     forward_cb: Option<Box<RpcForwardCallback>>,
-    result_cb: Option<Box<RpcResultCallback>>,
+    result_cb: Option<Box<RpcResultCallback<T>>>,
     data: T,
 }
 
@@ -33,7 +33,7 @@ impl<T> RpcNode<T>
     /// 创建一个新的 RPC 节点
     ///
     /// `nonce` 为该节点的唯一标识，用于标识该节点的调用请求和调用结果
-    pub fn new(serialize_ctx: SerializeCtx, nonce: u32, sender: T) -> Self {
+    pub fn new(serialize_ctx: SerializeCtx, nonce: u32, data: T) -> Self {
         RpcNode {
             serialize_ctx,
             imports: None,
@@ -42,7 +42,7 @@ impl<T> RpcNode<T>
             request_num: Mutex::new(Cell::new(0)),
             forward_cb: None,
             result_cb: None,
-            data: sender,
+            data,
         }
     }
 
@@ -63,7 +63,7 @@ impl<T> RpcNode<T>
 
     pub fn set_result_cb<CB>(&mut self, result_cb: CB)
     where
-        CB: Fn(&RpcResultCtx, &[u8]) -> Result<()> + Sync + Send + 'static,
+        CB: Fn(&RpcResultCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static,
     {
         self.result_cb = Some(Box::new(result_cb));
     }
@@ -105,13 +105,14 @@ impl<T> RpcNode<T>
         // - 如果报文是返回结果，并且没有发生错误，则需要调用回调。
         // - 如果报文是返回结果，并且发生错误，则返回错误。
         let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
-        let inner = msg.message();
-        let func = msg.func();
+        let seq_no = msg.seq_no();
+        let func = msg.func().clone();
+        let inner = msg.consume();
 
         match inner {
             Message::Request(args) => {
                 // 调用请求
-                let result = self.handle_request(msg.seq_no(), &func, &*args);
+                let result = self.handle_request(seq_no, &func, &args);
 
                 match result {
                     Ok(_) => Ok(()),
@@ -119,7 +120,7 @@ impl<T> RpcNode<T>
                         // 如果没有对应的回调，则调用 `forward_cb` 把这个报文转发给其他模块
                         let forward_cb =
                             self.forward_cb.as_ref().ok_or(format!("no forward_cb"))?;
-                        forward_cb(msg.seq_no(), func.clone(), raw_msg)
+                        forward_cb(seq_no, func.clone(), raw_msg)
                     }
                 }
             }
@@ -127,8 +128,8 @@ impl<T> RpcNode<T>
                 // 返回结果
                 let result_cb =
                     self.result_cb.as_ref().ok_or(format!("no result_cb"))?;
-                let ctx = RpcResultCtx::new(msg.seq_no(), &self.serialize_ctx);
-                result_cb(&ctx, &*res)
+                let ctx = RpcResultCtx::new(seq_no, &self.serialize_ctx, &self.data);
+                result_cb(&ctx, res)
             }
         }
     }

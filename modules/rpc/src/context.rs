@@ -35,6 +35,10 @@ impl RpcMessage {
     pub fn message(&self) -> &Message {
         &self.message
     }
+
+    pub fn consume(self) -> Message {
+        self.message
+    }
 }
 
 /// RPC 函数调用请求的临时上下文，用于在相关函数回调中提供调用请求所需的 API
@@ -124,16 +128,18 @@ impl<'a, T> RpcResponseCtx<'a, T> {
 }
 
 /// RPC 函数调用结果返回值的临时上下文，用于在相关函数回调中提供解析、处理调用结果所需的 API
-pub struct RpcResultCtx<'a> {
+pub struct RpcResultCtx<'a, T> {
     seq_no: RpcSeqNo,
     serialize_ctx: &'a SerializeCtx,
+    data: &'a T,
 }
 
-impl<'a> RpcResultCtx<'a> {
-    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx) -> Self {
+impl<'a, T> RpcResultCtx<'a, T> {
+    pub fn new(seq_no: RpcSeqNo, serialize_ctx: &'a SerializeCtx, data: &'a T) -> Self {
         RpcResultCtx {
             seq_no,
             serialize_ctx,
+            data,
         }
     }
 
@@ -143,5 +149,9 @@ impl<'a> RpcResultCtx<'a> {
 
     pub fn seq_no(&self) -> RpcSeqNo {
         self.seq_no
+    }
+
+    pub fn data(&self) -> &T {
+        self.data
     }
 }
