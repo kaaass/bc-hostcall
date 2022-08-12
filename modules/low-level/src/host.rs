@@ -14,6 +14,7 @@ struct InstanceCtx {
     canonical_abi_realloc: TypedFunc<(i32, i32, i32, i32), i32>,
     host_message_handler: TypedFunc<(i32, i32), ()>,
     wasm_poll: Option<TypedFunc<(), ()>>,
+    wasm_main: Option<TypedFunc<(), ()>>,
     memory: Memory,
 }
 
@@ -91,12 +92,15 @@ impl<T> LowLevelCtx<T>
             store.as_context_mut(), "__bc_low_level_host_message_handler")?;
         let wasm_poll = instance.get_typed_func(
             store.as_context_mut(), "__bc_low_level_wasm_poll").ok();
+        let wasm_main = instance.get_typed_func(
+            store.as_context_mut(), "__bc_main").ok();
 
         *wasm_funcs = Some(InstanceCtx {
             canonical_abi_realloc,
             canonical_abi_free,
             host_message_handler,
             wasm_poll,
+            wasm_main,
             memory: instance.get_memory(store.as_context_mut(), "memory").unwrap(), // FIXME
         });
 
@@ -225,6 +229,38 @@ impl<T> LowLevelCtx<T>
         // 发送消息
         func_wasm_poll.call(&mut store, ())?;
 
+        Ok(())
+    }
+
+    pub fn wasm_main(&self) -> Result<()> {
+        // 如果有 oneshot_caller，说明是嵌套调用，则直接使用
+        let oneshot_caller = self.oneshot_caller.lock().unwrap();
+        let caller = oneshot_caller.replace(None);
+        drop(oneshot_caller);
+        if let Some(caller) = caller {
+            return self.wasm_main_with_store(caller);
+        }
+
+        // 没有的话看看是否持有 Store
+        let temp_store = self.temp_store.lock().unwrap();
+        let mut store = temp_store.replace(None).ok_or("No available store!")?;
+
+        let result = self.wasm_main_with_store(store.as_context_mut());
+
+        // 放回 store
+        temp_store.replace(Some(store));
+
+        return result;
+    }
+
+    fn wasm_main_with_store(&self, mut store: impl AsContextMut) -> Result<()> {
+        let mut instance_ctx = self.instance_ctx.lock().unwrap();
+        let instance_ctx = instance_ctx.get_mut().as_ref().unwrap();
+        let func_wasm_main = &instance_ctx.wasm_main
+            .ok_or("No `wasm_main` function exported!")?;
+
+        // 发送消息
+        func_wasm_main.call(&mut store, ())?;
         Ok(())
     }
 }
