@@ -4,9 +4,10 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use std::fmt::Debug;
+
 use wasmtime_wasi::WasiCtx;
 
-use rpc::{RpcNode, adapter::HostSendMessageAdapter};
+use rpc::{adapter::HostSendMessageAdapter, RpcNode};
 
 mod host_call_wasm;
 mod wasm_call_host;

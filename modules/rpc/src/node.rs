@@ -3,16 +3,17 @@
 use std::cell::Cell;
 use std::sync::Mutex;
 
-use crate::{abi, Message, Result, RpcExports, RpcMessage, RpcRequestCtx, RpcResponseCtx, RpcEndCtx};
 use serialize::SerializeCtx;
+
+use crate::{abi, Message, Result, RpcEndCtx, RpcExports, RpcMessage, RpcRequestCtx, RpcResponseCtx};
 
 pub type RpcSeqNo = u64;
 
 pub type RpcForwardCallback<T> =
-    dyn Fn(&RpcEndCtx<T>, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
+dyn Fn(&RpcEndCtx<T>, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static;
 
 pub type RpcResultCallback<T> =
-    dyn Fn(&RpcEndCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static;
+dyn Fn(&RpcEndCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static;
 
 pub struct RpcNode<T>
     where T: Send + Sync + 'static,
@@ -51,15 +52,15 @@ impl<T> RpcNode<T>
     }
 
     pub fn set_forward_cb<CB>(&mut self, forward_cb: CB)
-    where
-        CB: Fn(&RpcEndCtx<T>, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static,
+        where
+            CB: Fn(&RpcEndCtx<T>, abi::FunctionIdent, &[u8]) -> Result<()> + Sync + Send + 'static,
     {
         self.forward_cb = Some(Box::new(forward_cb));
     }
 
     pub fn set_result_cb<CB>(&mut self, result_cb: CB)
-    where
-        CB: Fn(&RpcEndCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static,
+        where
+            CB: Fn(&RpcEndCtx<T>, Vec<u8>) -> Result<()> + Sync + Send + 'static,
     {
         self.result_cb = Some(Box::new(result_cb));
     }
@@ -158,14 +159,15 @@ impl<T> RpcNode<T>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::abi::LinkHint::Host;
-
-    use crate::RpcResponseCtx;
     use std::cell::Cell;
     use std::sync::Arc;
     use std::sync::Mutex;
+
+    use crate::abi::LinkHint::Host;
     use crate::adapter::SendMessageAdapter;
+    use crate::RpcResponseCtx;
+
+    use super::*;
 
     static mut MSG: Option<Vec<u8>> = None;
 

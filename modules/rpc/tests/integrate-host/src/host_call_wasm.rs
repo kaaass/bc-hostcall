@@ -2,7 +2,7 @@
 
 use once_cell::sync::OnceCell;
 
-use rpc::{abi, Result, RpcNode, RpcEndCtx};
+use rpc::{abi, Result, RpcEndCtx, RpcNode};
 use rpc::adapter::SendMessageAdapter;
 use serialize::{ArgsBuilder, SerializeCtx};
 
@@ -53,7 +53,8 @@ fn lowlevel_callback(data: &[u8]) {
 }
 
 mod tests {
-    use std::sync::{Arc};
+    use std::sync::Arc;
+
     use low_level::host::LowLevelCtx;
     use rpc::adapter::HostSendMessageAdapter;
 

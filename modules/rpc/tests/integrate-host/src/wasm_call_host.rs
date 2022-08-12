@@ -61,7 +61,8 @@ fn init_exports<T: 'static>() -> RpcExports<T> {
 }
 
 mod tests {
-    use std::sync::{Arc};
+    use std::sync::Arc;
+
     use low_level::host::LowLevelCtx;
     use rpc::adapter::HostSendMessageAdapter;
 

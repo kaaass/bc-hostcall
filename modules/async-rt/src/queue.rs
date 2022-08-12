@@ -1,6 +1,6 @@
 //! 本文件来自于 https://github.com/rustwasm/wasm-bindgen，遵照 MIT license 引入
 
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 

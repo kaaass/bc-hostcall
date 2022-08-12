@@ -1,11 +1,14 @@
 use std::io::Write;
 use std::sync::Arc;
+
 use tokio::task;
+
 use bc_hostcall::module_api::manager::ModuleManager;
 use bc_hostcall::module_api::module::WasmModule;
 use bc_hostcall::rpc::abi;
+
 use crate::exports::init_exports;
-use crate::imports::{app};
+use crate::imports::app;
 
 mod imports;
 mod exports;

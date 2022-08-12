@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
-use rpc::adapter::{SendMessageAdapter, WasmSendMessageAdapter};
-use rpc::{abi, RpcEndCtx, RpcNode, RpcSeqNo};
+
 use low_level::set_message_callback;
+use rpc::{abi, RpcEndCtx, RpcNode, RpcSeqNo};
+use rpc::adapter::{SendMessageAdapter, WasmSendMessageAdapter};
+
 use crate::queue::QUEUE;
 
 /// WASM 内部的运行时上下文

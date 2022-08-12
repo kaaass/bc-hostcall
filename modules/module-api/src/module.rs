@@ -1,12 +1,14 @@
 use std::sync::Arc;
+
 use wasmtime::{Engine, Linker, Store};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
+
 use async_api::ctx::AsyncCtx;
 use low_level::host::LowLevelCtx;
 use rpc::{abi, RpcExports, RpcNode};
 use serialize::SerializeCtx;
-use crate::manager::ModuleManager;
 
+use crate::manager::ModuleManager;
 use crate::Result;
 
 /// WASM 模块在本运行时中的封装
@@ -17,7 +19,6 @@ pub struct WasmModule {
 }
 
 impl WasmModule {
-
     pub fn new() -> Self {
         WasmModule {
             name: None,
@@ -59,7 +60,7 @@ impl WasmModule {
         let mut rpc_node = RpcNode::new(
             SerializeCtx::new(),
             0,
-            async_ctx.clone()
+            async_ctx.clone(),
         );
 
         // 增加 Host 端的导入导出需求
@@ -145,9 +146,10 @@ impl WasmModule {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rpc::abi;
     use serialize::ArgsBuilder;
+
+    use super::*;
 
     fn init_exports() -> RpcExports<Arc<AsyncCtx>> {
         RpcExports::new(abi::LinkHint::BcModule("integrate-wasm".to_string()))

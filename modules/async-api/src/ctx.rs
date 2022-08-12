@@ -2,11 +2,14 @@ use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
+
 use tokio;
 use tokio::sync::Notify;
+
 use low_level::host::LowLevelCtx;
-use rpc::{abi, RpcNode, RpcEndCtx, RpcSeqNo, RpcResponseCtx};
+use rpc::{abi, RpcEndCtx, RpcNode, RpcResponseCtx, RpcSeqNo};
 use serialize::SerializeCtx;
+
 use crate::future::{AsyncRequestFuture, HandleRxFuture, HandleTxFuture};
 use crate::Result;
 
@@ -21,11 +24,10 @@ pub enum ResultAction {
 }
 
 pub type CtxResolveCallback =
-    dyn Fn(abi::LinkHint) -> Result<Arc<AsyncCtx>> + Send + Sync;
+dyn Fn(abi::LinkHint) -> Result<Arc<AsyncCtx>> + Send + Sync;
 
 /// 模块的异步上下文，主要维护围绕两个队列驱动的异步任务
 pub struct AsyncCtx {
-
     // 初始化提醒
     pub init_notify: Notify,
 
@@ -49,7 +51,6 @@ pub struct AsyncCtx {
 }
 
 impl AsyncCtx {
-
     pub fn new() -> Self {
         AsyncCtx {
             init_notify: Notify::new(),
@@ -139,7 +140,7 @@ impl AsyncCtx {
                 // 唤醒 Future
                 waker.wake();
                 Ok(())
-            },
+            }
             ResultAction::ForwardResult(link_hint, func) => {
                 // 转发结果动作
                 let mut resolve_cb = ctx.data().resolve_cb.lock().unwrap();
@@ -158,7 +159,7 @@ impl AsyncCtx {
                 dest_ctx.push_rx(resp_msg);
 
                 Ok(())
-            },
+            }
             _ => Err(format!("seq_no {}: action not support", seq_no).into()),
         }
     }

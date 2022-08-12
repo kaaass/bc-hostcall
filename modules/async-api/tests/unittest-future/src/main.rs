@@ -27,5 +27,4 @@ pub extern "C" fn get_cnt() -> i32 {
     }
 }
 
-fn main() {
-}
+fn main() {}

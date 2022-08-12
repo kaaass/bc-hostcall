@@ -34,6 +34,7 @@ mod wasm {
 #[cfg(not(target_arch = "wasm32"))]
 mod host {
     use std::sync::Arc;
+
     use low_level::host::LowLevelCtx;
 
     use super::*;

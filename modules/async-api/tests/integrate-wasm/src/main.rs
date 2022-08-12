@@ -2,14 +2,12 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use std::fmt::Debug;
-
+use host_call_wasm::*;
+use rpc::adapter::SendMessageAdapter;
+use rpc::adapter::WasmSendMessageAdapter;
 use rpc::RpcNode;
 use serialize::SerializeCtx;
-use rpc::adapter::WasmSendMessageAdapter;
-use rpc::adapter::SendMessageAdapter;
-
-use host_call_wasm::*;
+use std::fmt::Debug;
 
 mod host_call_wasm;
 
@@ -33,13 +31,12 @@ impl Debug for MockWasmContext {
 /// bc_wasm_main!(async_main)
 /// ```
 pub(crate) mod __bc {
+    use low_level::set_message_callback;
     use once_cell::sync::OnceCell;
 
     use super::*;
 
     pub static CTX: OnceCell<MockWasmContext> = OnceCell::new();
-
-    use low_level::set_message_callback;
 
     fn __bc_message_callback(msg: &[u8]) {
         println!("接收到 Host 消息：{:?}", msg);

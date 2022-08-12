@@ -15,8 +15,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// 将异步任务送入本地队列执行
 #[inline]
 pub fn spawn_local<F>(future: F)
-where
-    F: Future<Output = ()> + 'static,
+    where
+        F: Future<Output=()> + 'static,
 {
     task::Task::spawn(Box::pin(future));
 }
@@ -25,12 +25,12 @@ where
 mod tests {
     use std::cell::Cell;
     use std::rc::Rc;
+
     use crate::queue::QUEUE;
     use crate::spawn_local;
 
     #[test]
     fn test_future() {
-
         let cnt = Rc::new(Cell::new(0));
 
         let ccnt = cnt.clone();

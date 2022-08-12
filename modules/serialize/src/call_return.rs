@@ -1,7 +1,8 @@
 //! 参数及其返回值等等与函数调用相关的序列化和反序列化
 
-use crate::{HostcallValue, Result, SerializeCtx};
 use serde::{Deserialize, Serialize};
+
+use crate::{HostcallValue, Result, SerializeCtx};
 
 /// 用于构建可序列化的参数的数据结构，其内部应该维护一系列等待序列化的参数的引用
 ///
@@ -79,7 +80,7 @@ impl<'a> Args<'a> {
     pub fn from_bytes(ctx: &'a SerializeCtx, bytes: &[u8]) -> Result<Self> {
         Ok(Args {
             inner_args: ctx.deserialize(bytes)?,
-            ctx
+            ctx,
         })
     }
 

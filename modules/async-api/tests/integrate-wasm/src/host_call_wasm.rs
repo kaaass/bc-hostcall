@@ -2,8 +2,8 @@
 
 use rpc::{Result, RpcExports, RpcResponseCtx};
 use rpc::abi;
+use rpc::adapter::{SendMessageAdapter, WasmSendMessageAdapter};
 use serialize::Args;
-use rpc::adapter::{WasmSendMessageAdapter, SendMessageAdapter};
 
 /// Wasm 内导出的函数
 fn wasm_export_to_host(param: String) -> String {

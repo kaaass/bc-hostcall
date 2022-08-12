@@ -1,18 +1,12 @@
-
-pub use low_level;
-pub use serialize;
-pub use rpc;
-
-#[cfg(target_arch = "wasm32")]
-pub use low_level::set_message_callback;
-
 #[cfg(not(target_arch = "wasm32"))]
 pub use async_api;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use module_api;
-
 pub use async_rt;
-
 #[cfg(target_arch = "wasm32")]
 pub use async_rt::bc_wasm_module;
+pub use low_level;
+#[cfg(target_arch = "wasm32")]
+pub use low_level::set_message_callback;
+#[cfg(not(target_arch = "wasm32"))]
+pub use module_api;
+pub use rpc;
+pub use serialize;

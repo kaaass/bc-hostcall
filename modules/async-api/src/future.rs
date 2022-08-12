@@ -3,8 +3,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
+
 use low_level::host::LowLevelCtx;
 use rpc::RpcSeqNo;
+
 use crate::ctx::{AsyncCtx, ResultAction};
 
 /// 处理接受队列信息、进行转发及调用的异步任务
@@ -160,11 +162,11 @@ impl Future for AsyncRequestFuture {
                     triggered.set(true);
                 }
                 Poll::Pending
-            },
+            }
             Some(ResultAction::Response(msg)) => {
                 // 获取结果
                 Poll::Ready(Ok(msg))
-            },
+            }
             Some(action) => {
                 // 不支持的结果类型，放回
                 self.ctx.push_action(self.seq_no, action);
@@ -176,7 +178,8 @@ impl Future for AsyncRequestFuture {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc};
+    use std::sync::Arc;
+
     use low_level::host::LowLevelCtx;
     use rpc::{abi, RpcNode};
     use serialize::{ArgsBuilder, SerializeCtx};
@@ -277,7 +280,7 @@ mod tests {
         let rpc_node = RpcNode::new(
             SerializeCtx::new(),
             0,
-            ctx.clone()
+            ctx.clone(),
         );
 
         // 绑定 RpcNode

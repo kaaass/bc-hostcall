@@ -1,11 +1,13 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
 use rpc::abi;
+
 use crate::module::WasmModule;
 
 pub struct ModuleManager {
-    modules: Mutex<Cell<HashMap<abi::LinkHint, Arc<WasmModule>>>>
+    modules: Mutex<Cell<HashMap<abi::LinkHint, Arc<WasmModule>>>>,
 }
 
 impl ModuleManager {

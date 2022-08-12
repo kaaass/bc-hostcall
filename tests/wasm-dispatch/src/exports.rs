@@ -3,11 +3,11 @@
 use bc_hostcall::async_rt::spawn_local;
 use bc_hostcall::rpc::{Result, RpcExports, RpcResponseCtx};
 use bc_hostcall::rpc::abi;
+use bc_hostcall::rpc::adapter::{SendMessageAdapter, WasmSendMessageAdapter};
 use bc_hostcall::serialize::{Args, SerializeCtx};
-use bc_hostcall::rpc::adapter::{WasmSendMessageAdapter, SendMessageAdapter};
 
-use crate::MODULE_NAME;
 use crate::imports::http_get;
+use crate::MODULE_NAME;
 
 /// Wasm 内导出的函数
 async fn app(param: String) -> String {

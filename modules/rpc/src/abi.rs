@@ -1,6 +1,6 @@
 //! 函数调用相关的 ABI 定义，用于定位函数符号、检验调用数据等
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// 链接函数时提供给链接器的提示
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

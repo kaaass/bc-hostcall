@@ -1,10 +1,11 @@
 //! 进行基础序列化工作的系列定义
 
 use serde::{Deserialize, Serialize};
+
 use crate::Result;
 
 /// 可序列化类型的标注 trait
-pub trait HostcallValue<'a> : Serialize + Deserialize<'a> {}
+pub trait HostcallValue<'a>: Serialize + Deserialize<'a> {}
 
 impl<'a, T> HostcallValue<'a> for T where T: Serialize + Deserialize<'a> {}
 

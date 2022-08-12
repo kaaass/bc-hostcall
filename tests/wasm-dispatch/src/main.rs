@@ -3,11 +3,10 @@
 #![cfg(target_arch = "wasm32")]
 
 use bc_hostcall::bc_wasm_module;
+use exports::*;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
-
-use exports::*;
 
 mod exports;
 pub mod imports;

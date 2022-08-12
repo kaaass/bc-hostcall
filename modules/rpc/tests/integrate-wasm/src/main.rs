@@ -4,11 +4,10 @@
 
 use std::fmt::Debug;
 
+use host_call_wasm::*;
+use rpc::adapter::WasmSendMessageAdapter;
 use rpc::RpcNode;
 use serialize::SerializeCtx;
-use rpc::adapter::WasmSendMessageAdapter;
-
-use host_call_wasm::*;
 use wasm_call_host::*;
 
 mod host_call_wasm;
@@ -36,11 +35,11 @@ impl Debug for MockWasmContext {
 pub(crate) mod __bc {
     use once_cell::sync::OnceCell;
 
+    use low_level::set_message_callback;
+
     use super::*;
 
     pub static CTX: OnceCell<MockWasmContext> = OnceCell::new();
-
-    use low_level::set_message_callback;
 
     fn __bc_message_callback(msg: &[u8]) {
         println!("接收到 Host 消息：{:?}", msg);

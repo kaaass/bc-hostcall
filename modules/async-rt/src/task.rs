@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 struct Inner {
-    future: Pin<Box<dyn Future<Output = ()> + 'static>>,
+    future: Pin<Box<dyn Future<Output=()> + 'static>>,
     waker: Waker,
 }
 
@@ -24,7 +24,7 @@ pub(crate) struct Task {
 }
 
 impl Task {
-    pub(crate) fn spawn(future: Pin<Box<dyn Future<Output = ()> + 'static>>) {
+    pub(crate) fn spawn(future: Pin<Box<dyn Future<Output=()> + 'static>>) {
         let this = Rc::new(Self {
             inner: RefCell::new(None),
             is_queued: Cell::new(true),

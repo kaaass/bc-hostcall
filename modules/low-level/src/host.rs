@@ -1,11 +1,12 @@
 //! 本模块用于提供在 Host 中进行信息传送的低层接口
 
-use crate::Result;
-
-use wasmtime::{TypedFunc, Linker, Caller, Instance, Memory, Trap, Store, AsContextMut};
-use std::sync::{Arc, Mutex};
 use std::cell::Cell;
 use std::mem;
+use std::sync::{Arc, Mutex};
+
+use wasmtime::{AsContextMut, Caller, Instance, Linker, Memory, Store, Trap, TypedFunc};
+
+use crate::Result;
 
 type OptionWrapper<T> = Mutex<Cell<Option<T>>>;
 
@@ -26,7 +27,7 @@ pub struct LowLevelCtx<T>
     /// 临时 caller，用来处理嵌套 call
     oneshot_caller: OptionWrapper<Caller<'static, T>>,
     /// 临时 store
-    temp_store: OptionWrapper<Store<T>>
+    temp_store: OptionWrapper<Store<T>>,
 }
 
 impl<T> LowLevelCtx<T>
@@ -296,9 +297,9 @@ fn store_many(this: &mut [u8], offset: i32, val: &[u8]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use crate::tests::*;
+
+    use super::*;
 
     #[test]
     fn test_send_message_to_wasm() {
