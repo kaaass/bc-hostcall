@@ -9,6 +9,7 @@ edition = "2021"
 tokio = { version = "1.20.1", features = ["full"] }
 rpc = { path = "../rpc" }
 low-level = { path = "../low-level" }
+serialize = { path = "../serialize" }
 
 [dev-dependencies]
 wasmtime = "0.39.1"

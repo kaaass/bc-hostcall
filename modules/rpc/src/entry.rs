@@ -42,6 +42,10 @@ impl<T> RpcExports<T> {
             None
         }
     }
+
+    pub fn hint(&self) -> &abi::LinkHint {
+        &self.hint
+    }
 }
 
 /// 导出函数的回调。第一个参数为发送返回结果的 RPC 上下文，第二个参数为反序列化前的参数。
