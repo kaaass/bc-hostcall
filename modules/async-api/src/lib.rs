@@ -20,7 +20,7 @@ mod tests {
         pub linker: Linker<T>,
     }
 
-    pub fn guest_prepare() -> Context<WasiCtx> {
+    pub fn guest_prepare(file: &str) -> Context<WasiCtx> {
         let engine = Engine::default();
         let mut linker = Linker::new(&engine);
 
@@ -35,7 +35,7 @@ mod tests {
 
         // 创建 Module 并进行实例化
         let module = Module::from_file(store.engine(),
-                                       "./tests/unittest-future/unittest-future.wasm").unwrap();
+                                       file).unwrap();
 
         Context { store, module, linker }
     }

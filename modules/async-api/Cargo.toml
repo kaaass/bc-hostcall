@@ -13,3 +13,4 @@ low-level = { path = "../low-level" }
 [dev-dependencies]
 wasmtime = "0.39.1"
 wasmtime-wasi = "0.39.1"
+serialize = { path = "../serialize" }
