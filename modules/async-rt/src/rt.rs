@@ -93,7 +93,7 @@ macro_rules! bc_wasm_module {
             rpc_ctx.set_exports(exports);
             // 设置回调
             rpc_ctx.set_forward_cb(|_, _, _| {
-                panic!("Wasm 模块内发生的转发请求");
+                panic!("模块未导出此函数！");
             });
             rpc_ctx.set_result_cb(bc_hostcall::async_rt::rt::result_message_cb);
             // 发送模块名称
