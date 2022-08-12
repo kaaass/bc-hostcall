@@ -170,6 +170,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(unused_must_use)]
     async fn test_multiple_module() {
         let wasm = "../async-api/tests/integrate-wasm/integrate-wasm.wasm";
 

@@ -187,6 +187,7 @@ mod tests {
 
     /// 测试 `HandleRxFuture`
     #[tokio::test]
+    #[allow(unused_must_use)]
     async fn test_rx_future() {
         let crate::tests::Context { mut store, module, mut linker }
             = guest_prepare("./tests/unittest-future/unittest-future.wasm");

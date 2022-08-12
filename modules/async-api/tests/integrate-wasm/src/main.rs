@@ -7,6 +7,7 @@ use std::fmt::Debug;
 use rpc::RpcNode;
 use serialize::SerializeCtx;
 use rpc::adapter::WasmSendMessageAdapter;
+use rpc::adapter::SendMessageAdapter;
 
 use host_call_wasm::*;
 
@@ -58,9 +59,10 @@ pub(crate) mod __bc {
         // 注册导出模块
         let exports = __bc_module_export();
         ctx.rpc_ctx.set_exports(exports);
-        // 注册导入模块
-        // let imports = __bc_module_import();
-        // ctx.rpc_ctx.set_imports(imports);
+        // 发送模块名称
+        let msg = ctx.rpc_ctx.make_peer_info("integrate-wasm".to_string());
+        let adapter = WasmSendMessageAdapter::new();
+        adapter.send_message(&msg).unwrap();
         // 设置上下文
         CTX.set(ctx).unwrap();
         // 此时应该启动 Wasm 内的异步运行时运行用户的异步 `main`。不过此处没有实现，
