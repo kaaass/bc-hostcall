@@ -108,12 +108,13 @@ impl<T> RpcNode<T>
         let msg: RpcMessage = self.serialize_ctx.deserialize(raw_msg)?;
         let seq_no = msg.seq_no();
         let func = msg.func().clone();
-        let inner = msg.consume();
+        let data = msg.data();
+        let message = msg.message();
 
-        match inner {
-            Message::Request(args) => {
+        match message {
+            Message::Request => {
                 // 调用请求
-                let result = self.handle_request(seq_no, &func, &args);
+                let result = self.handle_request(seq_no, &func, data);
 
                 match result {
                     Ok(_) => Ok(()),
@@ -126,17 +127,17 @@ impl<T> RpcNode<T>
                     }
                 }
             }
-            Message::Response(res) => {
+            Message::Response => {
                 // 返回结果
                 let result_cb =
                     self.result_cb.as_ref().ok_or(format!("no result_cb"))?;
                 let ctx = RpcEndCtx::new(seq_no, &self.serialize_ctx, &self.data);
-                result_cb(&ctx, res)
+                result_cb(&ctx, data.to_vec())
             }
             Message::PeerInfo(name) => {
                 // 设置对端名称
                 let peer_name = self.peer_name.lock().unwrap();
-                peer_name.set(Some(name));
+                peer_name.set(Some(name.clone()));
                 Ok(())
             }
         }
@@ -150,7 +151,7 @@ impl<T> RpcNode<T>
     pub fn make_peer_info(&self, name: String) -> Vec<u8> {
         // 拼接报文
         let func = abi::FunctionIdent::new("");
-        let msg = RpcMessage::new(u64::MAX, func, Message::PeerInfo(name));
+        let msg = RpcMessage::new(u64::MAX, func, Message::PeerInfo(name), &[]);
 
         // 序列化
         self.serialize_ctx.serialize(&msg).unwrap()

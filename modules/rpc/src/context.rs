@@ -7,22 +7,24 @@ use crate::{abi, Result, RpcSeqNo};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
-    Request(Vec<u8>),
-    Response(Vec<u8>),
+    Request,
+    Response,
     PeerInfo(String),
 }
 
 // 请求消息 便于序列化
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RpcMessage {
+pub struct RpcMessage<'a> {
     seq_no: RpcSeqNo,
     func: abi::FunctionIdent,
     message: Message,
+    #[serde(with = "serde_bytes")]
+    data: &'a [u8],
 }
 
-impl RpcMessage {
-    pub fn new(seq_no: RpcSeqNo, func: abi::FunctionIdent, message: Message) -> Self {
-        RpcMessage { seq_no, func, message }
+impl<'a> RpcMessage<'a> {
+    pub fn new(seq_no: RpcSeqNo, func: abi::FunctionIdent, message: Message, data: &'a [u8]) -> Self {
+        RpcMessage { seq_no, func, message, data }
     }
 
     pub fn seq_no(&self) -> RpcSeqNo {
@@ -37,8 +39,8 @@ impl RpcMessage {
         &self.message
     }
 
-    pub fn consume(self) -> Message {
-        self.message
+    pub fn data(&self) -> &[u8] {
+        self.data
     }
 }
 
@@ -63,7 +65,8 @@ impl<'a, T> RpcRequestCtx<'a, T> {
         let msg = RpcMessage {
             seq_no: self.seq_no,
             func,
-            message: Message::Request(args),
+            message: Message::Request,
+            data: &args,
         };
 
         // 序列化
@@ -106,7 +109,8 @@ impl<'a, T> RpcResponseCtx<'a, T> {
         let msg = RpcMessage {
             seq_no: self.seq_no,
             func,
-            message: Message::Response(result),
+            message: Message::Response,
+            data: &result,
         };
 
         // 序列化
