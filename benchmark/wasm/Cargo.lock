@@ -1428,19 +1428,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm"
+version = "0.1.0"
+dependencies = [
+ "bc-hostcall",
+]
+
+[[package]]
 name = "wasm-encoder"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8905fd25fdadeb0e7e8bf43a9f46f9f972d6291ad0c7a32573b88dd13a6cfa6b"
 dependencies = [
  "leb128",
-]
-
-[[package]]
-name = "wasm-service-a"
-version = "0.1.0"
-dependencies = [
- "bc-hostcall",
 ]
 
 [[package]]

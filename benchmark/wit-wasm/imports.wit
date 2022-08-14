@@ -1,0 +1,1 @@
+http-get: func(url: string) -> string

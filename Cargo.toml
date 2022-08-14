@@ -26,4 +26,6 @@ members = [
     "modules/async-rt",
     "modules/module-api",
     "tests/cli",
+    "benchmark/host",
+    "benchmark/wit-host",
 ]

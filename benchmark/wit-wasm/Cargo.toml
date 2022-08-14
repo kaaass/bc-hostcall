@@ -1,0 +1,12 @@
+[package]
+name = "wit-wasm"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wit-bindgen-rust = { git = "https://github.com/bytecodealliance/wit-bindgen.git" }
+
+[workspace]
+# 由于仅用于进行测试用文件的生成，因此使用空 [workspace] 避免加入外部 workspace

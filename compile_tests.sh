@@ -20,3 +20,7 @@ cd $base_dir || exit
 ./tests/wasm-dispatch/build.sh
 ./tests/wasm-service-a/build.sh
 ./tests/wasm-service-b/build.sh
+
+# benchmark
+./benchmark/wasm/build.sh
+./benchmark/wit-wasm/build.sh
