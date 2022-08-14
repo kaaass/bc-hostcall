@@ -35,3 +35,5 @@ load ./tests/wasm-service-b/wasm-service-b.wasm
 list
 call_app dispatch qweqwe
 ```
+
+[![asciicast](https://asciinema.org/a/wxhUJ622q35qPSogN2YjM9ihH.svg)](https://asciinema.org/a/wxhUJ622q35qPSogN2YjM9ihH)
